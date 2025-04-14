@@ -1248,14 +1248,12 @@ export default function RouteOptimizerPage() {
 
   // Improved return statement with route info overlay at bottom of map
   return (
-    <div className="p-8 pt-20 lg:pt-8 lg:pl-80 relative">
+    // Add back the left padding (lg:pl-80) to accommodate the sidebar
+    <div className="p-8 pt-20 lg:pt-8 lg:pl-80">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">
-          Eco-Friendly Route Optimizer
-        </h1>
+        <h1 className="text-3xl font-bold mb-2">Route Optimizer</h1>
         <p className="text-muted-foreground">
-          Find the healthiest and most environmentally friendly routes for your
-          journey
+          Find the cleanest routes with lowest air pollution exposure
         </p>
       </div>
 

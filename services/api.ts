@@ -69,7 +69,7 @@ export const airQualityApi = {
     const response = await axios.get(`${API_BASE_URL}/forecast`, {
       params,
     });
-    return response.data;
+    return response.data; // Add this line
   },
 
   getAirQualityComponents: async (

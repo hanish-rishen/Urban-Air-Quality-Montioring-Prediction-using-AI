@@ -419,7 +419,7 @@ export default function MonitoringPage() {
 
   if (loading) {
     return (
-      <div className="p-8 pt-20 lg:pt-8 lg:pl-80 flex items-center justify-center h-[80vh]">
+      <div className="p-8 pt-20 lg:pt-8 flex items-center justify-center h-[80vh]">
         <div className="flex flex-col items-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <p className="mt-4">Loading air quality data...</p>
@@ -430,7 +430,7 @@ export default function MonitoringPage() {
 
   if (error) {
     return (
-      <div className="p-8 pt-20 lg:pt-8 lg:pl-80">
+      <div className="p-8 pt-20 lg:pt-8">
         <Card className="p-6 bg-destructive/10">
           <div className="flex items-center gap-3 text-destructive">
             <AlertCircle className="h-5 w-5" />
@@ -443,6 +443,7 @@ export default function MonitoringPage() {
   }
 
   return (
+    // Add back the left padding (lg:pl-80) to accommodate the sidebar
     <div className="p-8 pt-20 lg:pt-8 lg:pl-80">
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Air Quality Monitoring</h1>
