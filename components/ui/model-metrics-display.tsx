@@ -33,6 +33,7 @@ import {
   Scatter,
   ZAxis,
   LabelList,
+  ReferenceLine,
 } from "recharts";
 
 export function ModelMetricsDisplay() {
@@ -95,21 +96,22 @@ export function ModelMetricsDisplay() {
 
   // Format metrics data for charts with validation to prevent NaN values
   const trainingData = metrics.epoch.map((epoch, index) => {
-    // Ensure accuracy is a valid number
-    const rawAccuracy = metrics.accuracy[index] || 0;
+    // Ensure accuracy is a valid number with explicit conversion
+    const rawAccuracy = Number(metrics.accuracy[index]) || 0;
+
     // More realistic accuracy values that never reach 100%
     const adjustedAccuracy =
-      Math.min(0.92, isNaN(rawAccuracy) ? 0 : rawAccuracy) * 100;
+      Math.min(0.92, isNaN(rawAccuracy) ? 0 : Number(rawAccuracy)) * 100;
 
-    // Ensure loss is a valid number
-    const rawLoss = metrics.loss[index] || 0;
-    const validLoss = isNaN(rawLoss) ? 0 : rawLoss;
+    // Ensure loss is a valid number with explicit conversion
+    const rawLoss = Number(metrics.loss[index]) || 0;
+    const validLoss = isNaN(rawLoss) ? 0 : Number(rawLoss);
 
     return {
-      epoch,
+      epoch: Number(epoch),
       loss: validLoss,
       accuracy: adjustedAccuracy,
-      rawAccuracy: (isNaN(rawAccuracy) ? 0 : rawAccuracy) * 100,
+      rawAccuracy: (isNaN(rawAccuracy) ? 0 : Number(rawAccuracy)) * 100,
     };
   });
 
@@ -128,12 +130,12 @@ export function ModelMetricsDisplay() {
     .map((_, i) => {
       const actual = 50 + Math.random() * 100; // Random AQI between 50-150
       // Predictions are close but with realistic error margins
-      const prediction = actual * (0.85 + Math.random() * 0.3);
+      const prediction = Number(actual) * (0.85 + Math.random() * 0.3);
       return {
         id: i + 1,
-        actual,
-        prediction,
-        error: Math.abs(prediction - actual),
+        actual: Number(actual),
+        prediction: Number(prediction),
+        error: Math.abs(Number(prediction) - Number(actual)),
       };
     });
 
@@ -499,7 +501,7 @@ const result = prediction.dataSync()[0];
                     <Tooltip
                       cursor={{ strokeDasharray: "3 3" }}
                       formatter={(value, name) => [
-                        `${Math.round(value * 100) / 100}`,
+                        `${Math.round(Number(value) * 100) / 100}`,
                         name,
                       ]}
                     />
@@ -510,18 +512,21 @@ const result = prediction.dataSync()[0];
                       fill="#8884d8"
                       shape="circle"
                     />
-                    {/* Add a reference line for perfect predictions */}
-                    <Line
-                      type="monotone"
-                      dataKey="actual"
-                      data={[
-                        { actual: 0, prediction: 0 },
-                        { actual: 150, prediction: 150 },
+                    {/* Use simple diagonal ReferenceLine for y=x */}
+                    <ReferenceLine
+                      segment={[
+                        { x: 0, y: 0 },
+                        { x: 200, y: 200 },
                       ]}
                       stroke="#ff7300"
                       strokeWidth={2}
-                      dot={false}
-                      activeDot={false}
+                      strokeDasharray="3 3"
+                      label={{
+                        value: "Ideal prediction (y=x)",
+                        position: "insideBottomRight",
+                        fill: "#ff7300",
+                        fontSize: 10,
+                      }}
                     />
                   </ScatterChart>
                 </ResponsiveContainer>
@@ -584,8 +589,8 @@ Sequential {
                   Verification Methods
                 </h3>
                 <p className="text-blue-700 dark:text-blue-300">
-                  This model's predictions are verified against historical air
-                  quality data from OpenAQ and EPA. Predictions show 92%
+                  This model&apos;s predictions are verified against historical
+                  air quality data from OpenAQ and EPA. Predictions show 92%
                   correlation with actual measurements for 24-hour forecasts,
                   dropping to 78% for 7-day forecasts. The model continuously
                   improves with each prediction by adjusting to local patterns
