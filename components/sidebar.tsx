@@ -62,7 +62,7 @@ export default function Sidebar() {
           <nav className="flex flex-col h-full bg-card p-6">
             <div className="px-3 py-2 flex items-center justify-between">
               <div>
-                <h2 className="mb-2 text-lg font-semibold">Air Quality Hub</h2>
+                <h2 className="mb-2 text-lg font-semibold">UAQMP</h2>
                 <p className="text-sm text-muted-foreground">
                   Monitor, predict, and plan for better air quality
                 </p>
@@ -77,7 +77,9 @@ export default function Sidebar() {
                   onClick={() => setOpen(false)}
                   className={cn(
                     "flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors",
-                    pathname === item.href ? "bg-accent text-accent-foreground" : "text-foreground"
+                    pathname === item.href
+                      ? "bg-accent text-accent-foreground"
+                      : "text-foreground"
                   )}
                 >
                   <item.icon className="h-5 w-5" />
@@ -107,7 +109,9 @@ export default function Sidebar() {
                 href={item.href}
                 className={cn(
                   "flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors",
-                  pathname === item.href ? "bg-accent text-accent-foreground" : "text-foreground"
+                  pathname === item.href
+                    ? "bg-accent text-accent-foreground"
+                    : "text-foreground"
                 )}
               >
                 <item.icon className="h-5 w-5" />
