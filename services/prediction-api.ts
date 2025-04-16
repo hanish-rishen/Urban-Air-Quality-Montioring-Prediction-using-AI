@@ -250,6 +250,39 @@ export const predictionApi = {
 
     return info;
   },
+
+  /**
+   * Get current air quality data as a baseline for predictions
+   */
+  async getCurrentAirQuality(
+    lat: string,
+    lon: string
+  ): Promise<{ aqi: number; components: Record<string, number> }> {
+    try {
+      // Try to get current AQ from backend API
+      const response = await axios.get(
+        `${API_BASE_URL}/current?lat=${lat}&lon=${lon}`
+      );
+      return {
+        aqi: response.data.aqi,
+        components: response.data.components,
+      };
+    } catch (error) {
+      console.error("Error fetching current air quality:", error);
+      // Fallback to default values
+      return {
+        aqi: 50,
+        components: {
+          pm2_5: 30,
+          pm10: 60,
+          o3: 15,
+          no2: 10,
+          so2: 5,
+          co: 250,
+        },
+      };
+    }
+  },
 };
 
 /**
@@ -270,9 +303,9 @@ async function predictWithTensorFlow(
     let weatherDescription = "Unknown";
 
     try {
-      // Try to get current AQI data
+      // Try to get current AQI data - Fix localhost URL
       const aqiResponse = await axios.get(
-        `http://localhost:3001/api/current?lat=${lat}&lon=${lon}`
+        `${API_BASE_URL}/current?lat=${lat}&lon=${lon}`
       );
       if (aqiResponse.data && aqiResponse.data.aqi) {
         currentAQI = aqiResponse.data.aqi;
