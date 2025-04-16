@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { predictionApi } from "@/services/prediction-api";
 import {
   Card,
   CardContent,
@@ -11,8 +12,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Brain, LineChart, BarChart2, Share2, Info, Code } from "lucide-react";
-import { predictionApi } from "@/services/prediction-api";
+import { Brain, Code, LineChart, BarChart2, Share2, Info } from "lucide-react";
 import {
   LineChart as RechartsLineChart,
   Line,
@@ -24,16 +24,16 @@ import {
   ResponsiveContainer,
   BarChart,
   Bar,
+  ScatterChart,
+  Scatter,
+  ZAxis,
   RadarChart,
   PolarGrid,
   PolarAngleAxis,
   PolarRadiusAxis,
   Radar,
-  ScatterChart,
-  Scatter,
-  ZAxis,
-  LabelList,
-  ReferenceLine,
+  LabelList, // Add missing import for LabelList
+  ReferenceLine, // Add missing import for ReferenceLine
 } from "recharts";
 
 export function ModelMetricsDisplay() {
