@@ -22,13 +22,6 @@ interface NewsArticle {
   date: string;
 }
 
-interface YouTubeVideo {
-  title: string;
-  channelName: string;
-  url: string;
-  thumbnailUrl: string;
-}
-
 interface NewsProps {
   location: string;
   currentAQI?: string | number;
@@ -41,7 +34,6 @@ export function NewsSection({
   currentAQILevel,
 }: NewsProps) {
   const [articles, setArticles] = useState<NewsArticle[]>([]);
-  const [videos, setVideos] = useState<YouTubeVideo[]>([]);
   const [aiSummary, setAiSummary] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -118,13 +110,6 @@ export function NewsSection({
         ]);
       }
 
-      if (data.videos && Array.isArray(data.videos)) {
-        setVideos(data.videos);
-      } else {
-        console.warn("Invalid videos data received");
-        setVideos([]);
-      }
-
       // Set AI summary
       if (data.aiSummary) {
         setAiSummary(data.aiSummary);
@@ -185,7 +170,7 @@ Recent initiatives in the area include stricter emission controls for vehicles a
   }, [location]);
 
   // Loading state with skeleton UI
-  if (loading && articles.length === 0 && videos.length === 0) {
+  if (loading && articles.length === 0) {
     return (
       <Card className="w-full">
         <CardHeader>
@@ -229,10 +214,9 @@ Recent initiatives in the area include stricter emission controls for vehicles a
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="summary" className="space-y-4">
-          <TabsList className="grid grid-cols-3">
+          <TabsList className="grid grid-cols-2">
             <TabsTrigger value="summary">AI Summary</TabsTrigger>
             <TabsTrigger value="articles">News Articles</TabsTrigger>
-            <TabsTrigger value="videos">Videos</TabsTrigger>
           </TabsList>
 
           <TabsContent value="summary">
@@ -309,76 +293,6 @@ Recent initiatives in the area include stricter emission controls for vehicles a
                   </CardContent>
                 </Card>
               ))
-            )}
-          </TabsContent>
-
-          <TabsContent value="videos" className="space-y-4">
-            {videos.length === 0 ? (
-              <p className="text-muted-foreground text-center py-8">
-                No videos available at this time.
-              </p>
-            ) : (
-              videos.map((video, index) => (
-                <Card key={index} className="overflow-hidden">
-                  <CardContent className="p-4">
-                    <div className="aspect-video bg-muted mb-3 rounded-md overflow-hidden">
-                      {video.thumbnailUrl ? (
-                        <img
-                          src={video.thumbnailUrl}
-                          alt={video.title}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-muted">
-                          <span className="text-muted-foreground">
-                            No thumbnail
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    <h3 className="text-lg font-semibold mb-1">
-                      {video.title}
-                    </h3>
-                    <p className="text-sm text-muted-foreground mb-3">
-                      {video.channelName}
-                    </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full"
-                      onClick={() => window.open(video.url, "_blank")}
-                    >
-                      Watch Video
-                      <ExternalLink className="h-3.5 w-3.5 ml-1" />
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))
-            )}
-
-            {videos.length === 0 && !loading && (
-              <Card className="p-6">
-                <div className="flex flex-col items-center justify-center text-center">
-                  <p className="mb-2 text-muted-foreground">
-                    No videos found for this topic.
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      window.open(
-                        `https://www.youtube.com/results?search_query=air+quality+${encodeURIComponent(
-                          location
-                        )}`,
-                        "_blank"
-                      )
-                    }
-                  >
-                    Search on YouTube
-                    <ExternalLink className="h-3.5 w-3.5 ml-1" />
-                  </Button>
-                </div>
-              </Card>
             )}
           </TabsContent>
         </Tabs>
