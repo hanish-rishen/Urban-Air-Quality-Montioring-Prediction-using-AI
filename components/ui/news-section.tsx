@@ -53,7 +53,7 @@ export function NewsSection({
       console.log(`Fetching news for location: ${location}`);
 
       // Build the URL with current AQI if available
-      let url = `http://localhost:3001/api/news/air-quality?location=${encodeURIComponent(
+      let url = `https://uaqmp-api.hanishrishen.workers.dev/api/news/air-quality?location=${encodeURIComponent(
         location
       )}`;
       if (currentAQI && currentAQILevel) {

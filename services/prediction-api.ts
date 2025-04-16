@@ -3,7 +3,8 @@ import * as tf from "@tensorflow/tfjs";
 
 // Constants
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
+  process.env.NEXT_PUBLIC_API_URL ||
+  "https://uaqmp-api.hanishrishen.workers.dev/api";
 const MODEL_STORAGE_KEY = "aqi-prediction-model";
 
 export interface PredictionResult {

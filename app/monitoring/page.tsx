@@ -72,17 +72,20 @@ export default function MonitoringPage() {
 
       // Also send this data to the backend to store
       try {
-        await fetch("http://localhost:3001/api/store-air-quality", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            aqi: aqData.aqi,
-            level: aqData.level,
-            components: aqData.components,
-          }),
-        });
+        await fetch(
+          "https://uaqmp-api.hanishrishen.workers.dev/api/store-air-quality",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              aqi: aqData.aqi,
+              level: aqData.level,
+              components: aqData.components,
+            }),
+          }
+        );
         console.log("Successfully stored air quality data on backend");
       } catch (storeError) {
         console.error(
@@ -129,7 +132,7 @@ export default function MonitoringPage() {
   const fetchComponents = async (lat: string, lon: string) => {
     try {
       const compResponse = await fetch(
-        `http://localhost:3001/api/components?lat=${lat}&lon=${lon}`,
+        `https://uaqmp-api.hanishrishen.workers.dev/api/components?lat=${lat}&lon=${lon}`,
         {
           method: "GET",
           headers: {
@@ -194,7 +197,7 @@ export default function MonitoringPage() {
         console.log("Fetching news after air quality data is loaded");
         // We don't need to await this, it can load independently now
         fetch(
-          `http://localhost:3001/api/news/air-quality?location=${encodeURIComponent(
+          `https://uaqmp-api.hanishrishen.workers.dev/api/news/air-quality?location=${encodeURIComponent(
             location
           )}`,
           {
