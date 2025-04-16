@@ -144,6 +144,12 @@ export default function PredictionPage() {
   const handleSelectSuggestion = useCallback(
     (suggestion: any) => {
       setLocation(suggestion.text);
+
+      // Clear existing data when selecting a new location
+      setHourlyPredictions([]);
+      setWeeklyPredictions([]);
+      setCurrentAQI(null);
+
       setCoordinates({
         lat: suggestion.position.lat.toString(),
         lon: suggestion.position.lon.toString(),
@@ -165,6 +171,16 @@ export default function PredictionPage() {
 
     try {
       setRefreshing(true);
+
+      // Clear existing predictions when searching for a new location
+      setHourlyPredictions([]);
+      setWeeklyPredictions([]);
+
+      // Also clear the current AQI data
+      setCurrentAQI(null);
+
+      // Use TomTom geocoding API to get coordinates from location name
+      console.log(`Searching for location: ${location}`);
 
       // Use TomTom geocoding API to get coordinates from location name
       const response = await fetch(
