@@ -235,6 +235,27 @@ export const predictionApi = {
 };
 
 /**
+ * Helper function to adjust weather factor based on weather conditions
+ */
+function adjustWeatherFactor(weatherMain: string): number {
+  let factor = 1.0;
+
+  if (weatherMain === "Rain" || weatherMain === "Drizzle") {
+    factor = 0.8; // Rain tends to clear pollution
+  } else if (weatherMain === "Thunderstorm") {
+    factor = 0.7; // Storms clear air more
+  } else if (weatherMain === "Snow") {
+    factor = 0.85;
+  } else if (weatherMain === "Clear") {
+    factor = 1.1; // Clear skies can allow more solar radiation = more ozone
+  } else if (weatherMain === "Mist" || weatherMain === "Fog") {
+    factor = 1.2; // Traps pollution
+  }
+
+  return factor;
+}
+
+/**
  * Make predictions using TensorFlow.js models with improved transparency
  */
 async function predictWithTensorFlow(
@@ -257,25 +278,49 @@ async function predictWithTensorFlow(
         `Fetching current AQI for ${lat}, ${lon} from ${API_BASE_URL}/current`
       );
 
-      const aqiResponse = await fetchWithCORS<AqiResponse>(
-        `${API_BASE_URL}/current?lat=${lat}&lon=${lon}`,
-        {
-          method: "GET",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      if (aqiResponse && aqiResponse.aqi) {
-        currentAQI = aqiResponse.aqi;
-        console.log(`Current AQI data successfully retrieved: ${currentAQI}`);
-      } else {
-        console.warn(
-          "Current AQI data response didn't contain AQI value:",
-          aqiResponse
+      // First try with standard CORS mode
+      try {
+        const aqiResponse = await fetchWithCORS<AqiResponse>(
+          `${API_BASE_URL}/current?lat=${lat}&lon=${lon}`,
+          {
+            method: "GET",
+            headers: {
+              Accept: "application/json",
+              "Content-Type": "application/json",
+            },
+          }
         );
+
+        if (aqiResponse && aqiResponse.aqi) {
+          currentAQI = aqiResponse.aqi;
+          console.log(`Current AQI data successfully retrieved: ${currentAQI}`);
+        } else {
+          console.warn(
+            "Current AQI data response didn't contain AQI value:",
+            aqiResponse
+          );
+        }
+      } catch (corsError) {
+        console.warn(
+          "CORS error in AQI fetch, trying fallback method:",
+          corsError
+        );
+
+        // Fallback to direct axios request which might handle CORS differently
+        try {
+          const response = await axios.get(
+            `${API_BASE_URL}/current?lat=${lat}&lon=${lon}`
+          );
+          if (response.data && response.data.aqi) {
+            currentAQI = response.data.aqi;
+            console.log(
+              `Current AQI data retrieved via axios fallback: ${currentAQI}`
+            );
+          }
+        } catch (axiosError) {
+          console.error("Axios fallback also failed:", axiosError);
+          // Use default AQI value
+        }
       }
     } catch (e) {
       console.error("Error fetching current AQI data:", e);
@@ -284,29 +329,47 @@ async function predictWithTensorFlow(
     // Get weather factor (simplified)
     try {
       // Use OpenWeather directly for simplicity if AQI call doesn't provide weather
-      const weatherResponse = await fetchWithCORS<WeatherResponse>(
-        `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${process.env.NEXT_PUBLIC_OPENWEATHER_API_KEY}`
-      );
+      // Try standard fetch first
+      try {
+        const weatherResponse = await fetchWithCORS<WeatherResponse>(
+          `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${process.env.NEXT_PUBLIC_OPENWEATHER_API_KEY}`
+        );
 
-      if (
-        weatherResponse &&
-        weatherResponse.weather &&
-        weatherResponse.weather.length > 0
-      ) {
-        const weather = weatherResponse.weather[0];
-        weatherDescription = weather.main;
+        if (
+          weatherResponse &&
+          weatherResponse.weather &&
+          weatherResponse.weather.length > 0
+        ) {
+          const weather = weatherResponse.weather[0];
+          weatherDescription = weather.main;
 
-        // Adjust factor based on weather conditions
-        if (weather.main === "Rain" || weather.main === "Drizzle") {
-          weatherFactor = 0.8; // Rain tends to clear pollution
-        } else if (weather.main === "Thunderstorm") {
-          weatherFactor = 0.7; // Storms clear air more
-        } else if (weather.main === "Snow") {
-          weatherFactor = 0.85;
-        } else if (weather.main === "Clear") {
-          weatherFactor = 1.1; // Clear skies can allow more solar radiation = more ozone
-        } else if (weather.main === "Mist" || weather.main === "Fog") {
-          weatherFactor = 1.2; // Traps pollution
+          // Adjust factor based on weather conditions - use the separate function now
+          weatherFactor = adjustWeatherFactor(weather.main);
+        }
+      } catch (corsError) {
+        console.warn(
+          "CORS error in weather fetch, trying fallback method:",
+          corsError
+        );
+
+        // Fallback to axios
+        try {
+          const response = await axios.get(
+            `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${process.env.NEXT_PUBLIC_OPENWEATHER_API_KEY}`
+          );
+          if (
+            response.data &&
+            response.data.weather &&
+            response.data.weather.length > 0
+          ) {
+            const weather = response.data.weather[0];
+            weatherDescription = weather.main;
+
+            // Adjust factor based on weather conditions - use the separate function here too
+            weatherFactor = adjustWeatherFactor(weather.main);
+          }
+        } catch (axiosError) {
+          console.error("Axios weather fallback also failed:", axiosError);
         }
       }
     } catch (e) {
@@ -573,4 +636,60 @@ function generateFallbackWeeklyPredictions(baseAQI = 50): PredictionResult[] {
   }
 
   return predictions;
+}
+
+/**
+ * Utility function to fetch data with multiple fallback strategies for CORS issues
+ * @param url The URL to fetch
+ * @param options Fetch options
+ * @returns The response data or null if all methods fail
+ */
+export async function fetchWithFallbacks<T>(
+  url: string,
+  options: RequestInit = {}
+): Promise<T | null> {
+  // Try standard fetchWithCORS first
+  try {
+    return await fetchWithCORS<T>(url, options);
+  } catch (corsError) {
+    console.warn(`CORS error with fetchWithCORS for ${url}:`, corsError);
+
+    // Try with axios as first fallback
+    try {
+      const method = options.method?.toLowerCase() || "get";
+      let response;
+
+      if (method === "get") {
+        response = await axios.get(url);
+      } else if (method === "post") {
+        response = await axios.post(
+          url,
+          options.body ? JSON.parse(options.body.toString()) : {}
+        );
+      } else {
+        throw new Error(`Method ${method} not supported in fallback`);
+      }
+
+      return response.data;
+    } catch (axiosError) {
+      console.warn(`Axios fallback failed for ${url}:`, axiosError);
+
+      // Try with a normal fetch with no-cors as last resort (will return opaque response)
+      try {
+        const response = await fetch(url, {
+          ...options,
+          mode: "no-cors",
+        });
+
+        // With no-cors, we can't access the content, so we'll return a placeholder
+        console.log(
+          `Fallback to no-cors succeeded for ${url}, but response content is opaque`
+        );
+        return null;
+      } catch (noCorsError) {
+        console.error(`All fallback methods failed for ${url}:`, noCorsError);
+        throw noCorsError;
+      }
+    }
+  }
 }
