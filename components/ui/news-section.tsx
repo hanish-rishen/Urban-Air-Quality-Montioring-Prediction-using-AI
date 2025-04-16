@@ -215,7 +215,7 @@ export function NewsSection({
                               variant="outline"
                               onClick={() =>
                                 window.open(
-                                  "http://localhost:3001/api/news/reset-cache",
+                                  "https://uaqmp-api.hanishrishen.workers.dev/api/news/reset-cache",
                                   "_blank"
                                 )
                               }
