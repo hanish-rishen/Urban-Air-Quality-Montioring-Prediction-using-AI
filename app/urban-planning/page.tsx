@@ -377,7 +377,7 @@ export default function UrbanPlanningPage() {
 
       // Fetch topology data
       const topologyResponse = await fetch(
-        `http://localhost:3001/api/urban-planning/topology?lat=${centerLat}&lon=${centerLng}`
+        `https://uaqmp-api.hanishrishen.workers.dev/api/urban-planning/topology?lat=${centerLat}&lon=${centerLng}`
       );
       if (!topologyResponse.ok)
         throw new Error(
@@ -389,7 +389,7 @@ export default function UrbanPlanningPage() {
       let airQualityData: any = {};
       try {
         const aqResponse = await fetch(
-          `http://localhost:3001/api/current?lat=${centerLat}&lon=${centerLng}`
+          `https://uaqmp-api.hanishrishen.workers.dev/api/current?lat=${centerLat}&lon=${centerLng}`
         );
         if (!aqResponse.ok)
           throw new Error(
@@ -738,7 +738,7 @@ export default function UrbanPlanningPage() {
 
       // Use the backend API endpoint
       const response = await fetch(
-        "http://localhost:3001/api/urban-planning/recommendations", // Corrected URL
+        "https://uaqmp-api.hanishrishen.workers.dev/api/urban-planning/recommendations", // Corrected URL
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

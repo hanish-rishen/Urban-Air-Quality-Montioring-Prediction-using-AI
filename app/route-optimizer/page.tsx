@@ -213,7 +213,7 @@ function RouteOptimizerContent() {
     setIsLoadingAirQuality(true);
     try {
       const response = await fetch(
-        `http://localhost:3001/api/current?lat=${lat}&lon=${lon}`
+        `https://uaqmp-api.hanishrishen.workers.dev/api/current?lat=${lat}&lon=${lon}`
       );
       if (response.ok) {
         const data = await response.json();

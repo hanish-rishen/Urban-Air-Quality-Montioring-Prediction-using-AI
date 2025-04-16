@@ -82,7 +82,7 @@ export default function PredictionPage() {
         let currentApiAqi = null;
         try {
           const response = await fetch(
-            `http://localhost:3001/api/current?lat=${latToUse}&lon=${lonToUse}`
+            `https://uaqmp-api.hanishrishen.workers.dev/api/current?lat=${latToUse}&lon=${lonToUse}`
           );
           if (response.ok) {
             const data = await response.json();

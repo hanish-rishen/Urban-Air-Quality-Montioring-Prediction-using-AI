@@ -49,7 +49,7 @@ export default function MonitoringPage() {
   const fetchAirQuality = async (lat: string, lon: string) => {
     try {
       const aqResponse = await fetch(
-        `http://localhost:3001/api/current?lat=${lat}&lon=${lon}`,
+        `https://uaqmp-api.hanishrishen.workers.dev/api/current?lat=${lat}&lon=${lon}`,
         {
           method: "GET",
           headers: {
