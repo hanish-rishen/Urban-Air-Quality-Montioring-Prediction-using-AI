@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -49,7 +49,8 @@ let searchMarkers: any[] = [];
 // API key from environment variables
 const TOMTOM_API_KEY = process.env.NEXT_PUBLIC_TOMTOM_API_KEY;
 
-export default function RouteOptimizerPage() {
+// Create a separate component that uses search params
+function RouteOptimizerContent() {
   const mapRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1220,8 +1221,80 @@ export default function RouteOptimizerPage() {
 
     // Cleanup function
     return () => {
-      if (map) {
-        map.remove();
+      try {
+        if (map) {
+          // Clear any route layers first
+          if (map.getStyle && map.getStyle()) {
+            const layers = map.getStyle().layers || [];
+            layers.forEach((layer: { id?: string }) => {
+              if (
+                layer.id &&
+                (layer.id.startsWith("route-") ||
+                  layer.id.includes("-alt-") ||
+                  layer.id.includes("air-quality"))
+              ) {
+                try {
+                  map.removeLayer(layer.id);
+                } catch (e) {
+                  console.log(`Failed to remove layer ${layer.id}`, e);
+                }
+              }
+            });
+
+            // Remove sources
+            const sources = Object.keys(map.getStyle().sources || {});
+            sources.forEach((sourceId) => {
+              if (
+                sourceId.startsWith("route-") ||
+                sourceId.includes("-alt-") ||
+                sourceId.includes("air-quality")
+              ) {
+                try {
+                  map.removeSource(sourceId);
+                } catch (e) {
+                  console.log(`Failed to remove source ${sourceId}`, e);
+                }
+              }
+            });
+          }
+
+          // Remove markers
+          if (searchMarkers && searchMarkers.length) {
+            searchMarkers.forEach((marker) => {
+              try {
+                if (marker && marker.remove) {
+                  marker.remove();
+                }
+              } catch (e) {
+                console.log("Failed to remove marker", e);
+              }
+            });
+          }
+
+          // Remove route control if it exists
+          if (routeControl) {
+            try {
+              map.removeControl(routeControl);
+            } catch (e) {
+              console.log("Failed to remove route control", e);
+            }
+            routeControl = null;
+          }
+
+          // Finally remove the map itself
+          try {
+            map.remove();
+          } catch (e) {
+            console.log("Non-critical error during map cleanup:", e);
+          }
+        }
+
+        // Reset these variables
+        map = null;
+        tomtom = null;
+        searchMarkers = [];
+      } catch (error) {
+        console.log("Error during map cleanup:", error);
       }
     };
   }, []);
@@ -1434,8 +1507,6 @@ export default function RouteOptimizerPage() {
                 </Select>
               </div>
 
-              {/* Remove Routing Algorithm Select section */}
-
               {/* Add route type descriptions */}
               <div className="mt-2 text-xs text-muted-foreground">
                 {routeType === "eco" && (
@@ -1593,5 +1664,23 @@ export default function RouteOptimizerPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Main component that wraps the content with a Suspense boundary
+export default function RouteOptimizerPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="p-8 pt-20 lg:pt-8 lg:pl-80">
+          <div className="flex items-center justify-center w-full h-[80vh]">
+            <Loader2 className="h-8 w-8 animate-spin" />
+            <span className="ml-2">Loading route optimizer...</span>
+          </div>
+        </div>
+      }
+    >
+      <RouteOptimizerContent />
+    </Suspense>
   );
 }

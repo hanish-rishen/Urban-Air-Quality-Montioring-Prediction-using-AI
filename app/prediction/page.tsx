@@ -46,6 +46,11 @@ export default function PredictionPage() {
   });
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
+  // Add state for current AQI
+  const [currentAQI, setCurrentAQI] = useState<{
+    aqi: number;
+    level: string;
+  } | null>(null);
 
   // Add new state for location suggestions
   const [locationSuggestions, setLocationSuggestions] = useState<any[]>([]);
@@ -57,75 +62,148 @@ export default function PredictionPage() {
   // Get model info
   const [modelInfo] = useState(() => predictionApi.getModelInformation());
 
-  // Get user's location on component mount - improved implementation
-  useEffect(() => {
-    // Get user's location and initialize data
-    const initLocation = async () => {
+  // Fetch prediction data with optional coordinates - Wrapped in useCallback
+  const fetchPredictionData = useCallback(
+    async (lat?: string, lon?: string) => {
       try {
-        if (navigator.geolocation) {
-          const position = await new Promise<GeolocationPosition>(
-            (resolve, reject) => {
-              navigator.geolocation.getCurrentPosition(resolve, reject, {
-                enableHighAccuracy: true,
-                timeout: 5000,
-                maximumAge: 0,
-              });
-            }
-          );
+        setRefreshing(true);
+        if (loading) setModelStatus("loading");
 
-          const lat = position.coords.latitude.toString();
-          const lon = position.coords.longitude.toString();
+        const latToUse = lat || coordinates.lat;
+        const lonToUse = lon || coordinates.lon;
 
-          // Set coordinates
-          setCoordinates({ lat, lon });
-
-          // Try to get location name with reverse geocoding
-          try {
-            const response = await fetch(
-              `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`
-            );
-            const data = await response.json();
-            let locationName = "Current Location";
-            if (data.city) {
-              locationName = data.city;
-            } else if (data.locality) {
-              locationName = data.locality;
-            } else if (data.countryName) {
-              locationName = data.countryName;
-            }
-            setLocation(locationName);
-          } catch (error) {
-            console.error("Error getting location name:", error);
-            setLocation("Current Location");
-          }
-
-          // Fetch predictions with the user's location
-          fetchPredictionData(lat, lon);
-        } else {
-          console.log("Geolocation not supported, using default coordinates");
-          // Fallback to a default location if geolocation is not available
-          const defaultLat = "37.7749";
-          const defaultLon = "-122.4194";
-          setCoordinates({ lat: defaultLat, lon: defaultLon });
-          setLocation("San Francisco, CA"); // Only use San Francisco as fallback
-          fetchPredictionData(defaultLat, defaultLon);
+        // Only proceed if we have coordinates
+        if (!latToUse || !lonToUse) {
+          setRefreshing(false);
+          return;
         }
-      } catch (error) {
-        console.error("Error getting user location:", error);
-        // Fallback to a default location
-        const defaultLat = "37.7749";
-        const defaultLon = "-122.4194";
-        setCoordinates({ lat: defaultLat, lon: defaultLon });
-        setLocation("San Francisco, CA"); // Only use San Francisco as fallback
-        fetchPredictionData(defaultLat, defaultLon);
-      }
-    };
 
-    initLocation();
-  }, []);
+        // First, fetch current AQI from backend
+        let currentApiAqi = null;
+        try {
+          const response = await fetch(
+            `http://localhost:3001/api/current?lat=${latToUse}&lon=${lonToUse}`
+          );
+          if (response.ok) {
+            const data = await response.json();
+            // Store the current AQI and level
+            setCurrentAQI({
+              aqi: data.aqi,
+              level: data.level,
+            });
+            currentApiAqi = data.aqi;
+            console.log(`Current API AQI: ${data.aqi}, Level: ${data.level}`);
+          }
+        } catch (error) {
+          console.error("Error fetching current AQI:", error);
+        }
+
+        // Continue with predictions
+        const hourlyData = await predictionApi.getHourlyPredictions(
+          latToUse,
+          lonToUse
+        );
+
+        // Replace first hourly prediction with actual current AQI if available
+        if (hourlyData.length > 0 && currentApiAqi !== null) {
+          hourlyData[0].aqi = currentApiAqi;
+          console.log("Updated hourly prediction with current API AQI value");
+        }
+
+        setHourlyPredictions(hourlyData);
+
+        const weeklyData = await predictionApi.getWeeklyPredictions(
+          latToUse,
+          lonToUse
+        );
+
+        // Replace first weekly prediction with actual current AQI if available
+        if (weeklyData.length > 0 && currentApiAqi !== null) {
+          weeklyData[0].aqi = currentApiAqi;
+          console.log("Updated weekly prediction with current API AQI value");
+        }
+
+        setWeeklyPredictions(weeklyData);
+
+        // Set model status based on data availability
+        setModelStatus(
+          hourlyData.length > 0 && weeklyData.length > 0 ? "ready" : "error"
+        );
+      } catch (error) {
+        console.error("Error fetching prediction data:", error);
+        setModelStatus("error");
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [coordinates.lat, coordinates.lon, loading, setModelStatus]
+  );
+
+  // Handle suggestion selection
+  const handleSelectSuggestion = useCallback(
+    (suggestion: any) => {
+      setLocation(suggestion.text);
+      setCoordinates({
+        lat: suggestion.position.lat.toString(),
+        lon: suggestion.position.lon.toString(),
+      });
+      setShowLocationSuggestions(false);
+
+      // Fetch new prediction data for selected location
+      fetchPredictionData(
+        suggestion.position.lat.toString(),
+        suggestion.position.lon.toString()
+      );
+    },
+    [fetchPredictionData]
+  );
+
+  // Search for a location
+  const searchLocation = useCallback(async () => {
+    if (!location) return;
+
+    try {
+      setRefreshing(true);
+
+      // Use TomTom geocoding API to get coordinates from location name
+      const response = await fetch(
+        `https://api.tomtom.com/search/2/geocode/${encodeURIComponent(
+          location
+        )}.json?key=${process.env.NEXT_PUBLIC_TOMTOM_API_KEY}`
+      );
+
+      if (!response.ok) throw new Error("Location search failed");
+
+      const data = await response.json();
+      if (data.results && data.results.length > 0) {
+        const result = data.results[0];
+        const newLat = result.position.lat.toString();
+        const newLon = result.position.lon.toString();
+
+        setCoordinates({
+          lat: newLat,
+          lon: newLon,
+        });
+
+        // Update location display name if available
+        if (result.address && result.address.freeformAddress) {
+          setLocation(result.address.freeformAddress);
+        }
+
+        // Fetch new prediction data for this location
+        await fetchPredictionData(newLat, newLon);
+      }
+    } catch (error) {
+      console.error("Error searching location:", error);
+      alert("Could not find the specified location. Please try again.");
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchPredictionData, location]);
 
   // Add new function to fetch location suggestions
-  const fetchLocationSuggestions = async (query: string) => {
+  const fetchLocationSuggestions = useCallback(async (query: string) => {
     if (!query || query.length < 2) {
       setLocationSuggestions([]);
       setShowLocationSuggestions(false);
@@ -162,201 +240,10 @@ export default function PredictionPage() {
       setLocationSuggestions([]);
       setShowLocationSuggestions(false);
     }
-  };
-
-  // Handle suggestion selection
-  const handleSelectSuggestion = (suggestion: any) => {
-    setLocation(suggestion.text);
-    setCoordinates({
-      lat: suggestion.position.lat.toString(),
-      lon: suggestion.position.lon.toString(),
-    });
-    setShowLocationSuggestions(false);
-
-    // Fetch new prediction data for selected location
-    fetchPredictionData(
-      suggestion.position.lat.toString(),
-      suggestion.position.lon.toString()
-    );
-  };
-
-  // Fetch prediction data with optional coordinates - Wrapped in useCallback
-  const fetchPredictionData = useCallback(
-    async (lat?: string, lon?: string) => {
-      try {
-        setRefreshing(true);
-        if (loading) setModelStatus("loading");
-
-        const latToUse = lat || coordinates.lat;
-        const lonToUse = lon || coordinates.lon;
-
-        // Only proceed if we have coordinates
-        if (!latToUse || !lonToUse) {
-          setRefreshing(false); // Ensure refreshing is set to false if we return early
-          return;
-        }
-
-        // Fetch hourly predictions
-        const hourlyData = await predictionApi.getHourlyPredictions(
-          latToUse,
-          lonToUse
-        );
-        setHourlyPredictions(hourlyData);
-
-        // Then fetch weekly predictions
-        const weeklyData = await predictionApi.getWeeklyPredictions(
-          latToUse,
-          lonToUse
-        );
-        setWeeklyPredictions(weeklyData);
-
-        // Set model status based on data availability
-        setModelStatus(
-          hourlyData.length > 0 && weeklyData.length > 0 ? "ready" : "error"
-        );
-      } catch (error) {
-        console.error("Error fetching prediction data:", error);
-        setModelStatus("error");
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    },
-    [coordinates.lat, coordinates.lon, loading, setModelStatus] // Add dependencies
-  );
-
-  // Get user's location on component mount - improved implementation
-  useEffect(() => {
-    // Get user's location and initialize data
-    const initLocation = async () => {
-      try {
-        if (navigator.geolocation) {
-          const position = await new Promise<GeolocationPosition>(
-            (resolve, reject) => {
-              navigator.geolocation.getCurrentPosition(resolve, reject, {
-                enableHighAccuracy: true,
-                timeout: 5000,
-                maximumAge: 0,
-              });
-            }
-          );
-
-          const lat = position.coords.latitude.toString();
-          const lon = position.coords.longitude.toString();
-
-          // Set coordinates
-          setCoordinates({ lat, lon });
-
-          // Try to get location name with reverse geocoding
-          try {
-            const response = await fetch(
-              `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`
-            );
-            const data = await response.json();
-            let locationName = "Current Location";
-            if (data.city) {
-              locationName = data.city;
-            } else if (data.locality) {
-              locationName = data.locality;
-            } else if (data.countryName) {
-              locationName = data.countryName;
-            }
-            setLocation(locationName);
-          } catch (error) {
-            console.error("Error getting location name:", error);
-            setLocation("Current Location");
-          }
-
-          // Fetch predictions with the user's location
-          fetchPredictionData(lat, lon); // Call fetchPredictionData here
-        } else {
-          console.log("Geolocation not supported, using default coordinates");
-          // Fallback to a default location if geolocation is not available
-          const defaultLat = "37.7749";
-          const defaultLon = "-122.4194";
-          setCoordinates({ lat: defaultLat, lon: defaultLon });
-          setLocation("San Francisco, CA"); // Only use San Francisco as fallback
-          fetchPredictionData(defaultLat, defaultLon); // Call fetchPredictionData here
-        }
-      } catch (error) {
-        console.error("Error getting user location:", error);
-        // Fallback to a default location
-        const defaultLat = "37.7749";
-        const defaultLon = "-122.4194";
-        setCoordinates({ lat: defaultLat, lon: defaultLon });
-        setLocation("San Francisco, CA"); // Only use San Francisco as fallback
-        fetchPredictionData(defaultLat, defaultLon); // Call fetchPredictionData here
-      }
-    };
-
-    initLocation();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fetchPredictionData]); // Add fetchPredictionData dependency
-
-  // Initial data fetch (now depends on coordinates and fetchPredictionData)
-  useEffect(() => {
-    // Only fetch if coordinates are available
-    if (coordinates.lat && coordinates.lon) {
-      fetchPredictionData(); // Call fetchPredictionData here
-
-      // Simulate model loading time - only if status is loading
-      if (modelStatus === "loading") {
-        const timer = setTimeout(() => {
-          // Check again before setting to ready, might have errored
-          if (modelStatus === "loading") {
-            setModelStatus("ready");
-          }
-        }, 2000);
-        return () => clearTimeout(timer);
-      }
-    }
-  }, [coordinates, fetchPredictionData, modelStatus, setModelStatus]); // Add dependencies
-
-  // Search for a location
-  const searchLocation = async () => {
-    if (!location) return;
-
-    try {
-      setRefreshing(true);
-
-      // Use TomTom geocoding API to get coordinates from location name
-      const response = await fetch(
-        `https://api.tomtom.com/search/2/geocode/${encodeURIComponent(
-          location
-        )}.json?key=${process.env.NEXT_PUBLIC_TOMTOM_API_KEY}`
-      );
-
-      if (!response.ok) throw new Error("Location search failed");
-
-      const data = await response.json();
-      if (data.results && data.results.length > 0) {
-        const result = data.results[0];
-        setCoordinates({
-          lat: result.position.lat.toString(),
-          lon: result.position.lon.toString(),
-        });
-
-        // Update location display name if available
-        if (result.address && result.address.freeformAddress) {
-          setLocation(result.address.freeformAddress);
-        }
-
-        // Fetch new prediction data for this location
-        await fetchPredictionData(
-          result.position.lat.toString(),
-          result.position.lon.toString()
-        );
-      }
-    } catch (error) {
-      console.error("Error searching location:", error);
-      alert("Could not find the specified location. Please try again.");
-    } finally {
-      setRefreshing(false);
-    }
-  };
+  }, []);
 
   // Download prediction report as CSV
-  const downloadReport = () => {
+  const downloadReport = useCallback(() => {
     // Combine hourly and weekly predictions into a CSV format
     let csvContent = "Date,Time,AQI,Category\n";
 
@@ -391,7 +278,120 @@ export default function PredictionPage() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  };
+  }, [hourlyPredictions]);
+
+  // Initial data fetch (depends on coordinates and fetchPredictionData)
+  useEffect(() => {
+    // Only fetch if coordinates are available
+    if (coordinates.lat && coordinates.lon) {
+      fetchPredictionData(); // Call fetchPredictionData here
+
+      // Simulate model loading time - only if status is loading
+      if (modelStatus === "loading") {
+        const timer = setTimeout(() => {
+          // Check again before setting to ready, might have errored
+          if (modelStatus === "loading") {
+            setModelStatus("ready");
+          }
+        }, 2000);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [coordinates, fetchPredictionData, modelStatus, setModelStatus]); // Add dependencies
+
+  // Get user's location on component mount - Fixed implementation
+  useEffect(() => {
+    // Get user's location and initialize data
+    const initLocation = async () => {
+      try {
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              const lat = position.coords.latitude.toString();
+              const lon = position.coords.longitude.toString();
+
+              // Only set coordinates and location if we don't already have a user-specified location
+              if (!coordinates.lat || !coordinates.lon) {
+                setCoordinates({ lat, lon });
+
+                // Try to get location name with reverse geocoding
+                fetch(
+                  `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`
+                )
+                  .then((response) => response.json())
+                  .then((data) => {
+                    let locationName = "Current Location";
+                    if (data.city) {
+                      locationName = data.city;
+                    } else if (data.locality) {
+                      locationName = data.locality;
+                    } else if (data.countryName) {
+                      locationName = data.countryName;
+                    }
+                    setLocation(locationName);
+                  })
+                  .catch((error) => {
+                    console.error("Error getting location name:", error);
+                    setLocation("Current Location");
+                  })
+                  .finally(() => {
+                    // Fetch predictions with the user's location
+                    fetchPredictionData(lat, lon);
+                  });
+              }
+            },
+            (error) => {
+              console.warn("Geolocation error:", error.message);
+              // Fallback to a default location if geolocation fails
+              const defaultLat = "37.7749";
+              const defaultLon = "-122.4194";
+
+              // Only set coordinates if we don't already have any
+              if (!coordinates.lat || !coordinates.lon) {
+                setCoordinates({ lat: defaultLat, lon: defaultLon });
+                setLocation("San Francisco, CA");
+                fetchPredictionData(defaultLat, defaultLon);
+              }
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+          );
+        } else {
+          console.log("Geolocation not supported, using default coordinates");
+          // Fallback to a default location if geolocation is not available
+          const defaultLat = "37.7749";
+          const defaultLon = "-122.4194";
+
+          // Only set if we don't already have coordinates
+          if (!coordinates.lat || !coordinates.lon) {
+            setCoordinates({ lat: defaultLat, lon: defaultLon });
+            setLocation("San Francisco, CA");
+            fetchPredictionData(defaultLat, defaultLon);
+          }
+        }
+      } catch (error) {
+        console.warn("Error in location initialization:", error);
+        // Avoid throwing a generic error that will appear in the console
+
+        // Fallback to a default location
+        const defaultLat = "37.7749";
+        const defaultLon = "-122.4194";
+
+        // Only set if we don't already have coordinates
+        if (!coordinates.lat || !coordinates.lon) {
+          setCoordinates({ lat: defaultLat, lon: defaultLon });
+          setLocation("San Francisco, CA");
+          fetchPredictionData(defaultLat, defaultLon);
+        }
+      }
+    };
+
+    // Only run on initial mount
+    initLocation();
+    // We're explicitly not including fetchPredictionData and coordinates as dependencies
+    // because we want this to run only once on mount, and we're guarding against
+    // unnecessary updates within the function itself
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     // Add back the left padding (lg:pl-80) to accommodate the sidebar
@@ -403,6 +403,49 @@ export default function PredictionPage() {
           learning
         </p>
       </div>
+
+      {/* Display current AQI from API */}
+      {currentAQI && (
+        <Card className="mb-6 border-2 border-primary">
+          <CardContent className="pt-6 pb-4">
+            <div className="flex flex-col md:flex-row justify-between items-center">
+              <div className="flex items-center gap-3 mb-3 md:mb-0">
+                <div
+                  className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg ${
+                    currentAQI.aqi <= 50
+                      ? "bg-green-500"
+                      : currentAQI.aqi <= 100
+                      ? "bg-yellow-500"
+                      : currentAQI.aqi <= 150
+                      ? "bg-orange-500"
+                      : currentAQI.aqi <= 200
+                      ? "bg-red-500"
+                      : currentAQI.aqi <= 300
+                      ? "bg-purple-500"
+                      : "bg-pink-900"
+                  }`}
+                >
+                  {currentAQI.aqi}
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold">Current AQI</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {currentAQI.level}
+                  </p>
+                </div>
+              </div>
+              <div className="text-sm">
+                <Badge variant="outline" className="mb-1">
+                  Real-time Data
+                </Badge>
+                <p className="text-muted-foreground text-xs">
+                  From OpenWeather API
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Location search */}
       <Card className="mb-6">
@@ -570,7 +613,9 @@ export default function PredictionPage() {
         <AqiPredictionChart
           data={hourlyPredictions}
           title="24-Hour AQI Forecast"
-          description="Hourly air quality predictions for the next 24 hours"
+          description={`Hourly air quality predictions starting with current AQI: ${
+            currentAQI?.aqi || "Loading..."
+          }`}
           height={350}
           hourly={true}
         />
@@ -582,7 +627,8 @@ export default function PredictionPage() {
           <CardHeader>
             <CardTitle>7-Day AQI Forecast</CardTitle>
             <CardDescription>
-              Predicted air quality for the next week
+              Predicted air quality starting from today&apos;s AQI:{" "}
+              {currentAQI?.aqi || "Loading..."}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -638,103 +684,6 @@ export default function PredictionPage() {
 
       {/* ML Model Metrics Display */}
       <ModelMetricsDisplay />
-
-      {/* About the model section */}
-      <Card className="mb-6 mt-6">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle>About the Prediction Model</CardTitle>
-            <CardDescription>
-              Technical details about our air quality prediction system
-            </CardDescription>
-          </div>
-          <div className="flex items-center gap-1">
-            <BarChart3 className="h-5 w-5 text-primary" />
-            <Brain className="h-5 w-5 text-primary" />
-          </div>
-        </CardHeader>
-        <CardContent className="prose prose-sm dark:prose-invert">
-          <div className="grid md:grid-cols-2 gap-6">
-            <div>
-              <h3 className="text-base font-semibold mb-2">
-                Model Architecture
-              </h3>
-              <p>
-                {modelInfo.name} is a {modelInfo.type} neural network optimized
-                for time-series forecasting of air quality patterns.
-              </p>
-              <p>
-                Based on the award-winning{" "}
-                <a
-                  href="https://github.com/benhamner/Air-Quality-Prediction-Hackathon-Winning-Model"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-medium underline"
-                >
-                  Kaggle Air Quality Prediction model
-                </a>{" "}
-                by Ben Hamner, with modern adaptations.
-              </p>
-              <div className="flex items-center gap-2 mt-3">
-                <Badge variant="outline">Deep Learning</Badge>
-                <Badge variant="outline">Time Series</Badge>
-                <Badge variant="outline">Environmental AI</Badge>
-              </div>
-
-              {modelInfo.architecture && (
-                <div className="mt-4 text-xs text-muted-foreground border p-2 rounded-md">
-                  <p className="font-semibold mb-1">Model Architecture:</p>
-                  <ul className="list-disc pl-4">
-                    {modelInfo.architecture.layers.map((layer, idx) => (
-                      <li key={idx}>{layer}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-
-            <div>
-              <h3 className="text-base font-semibold mb-2">Features & Data</h3>
-              <p className="text-sm text-muted-foreground">
-                <strong>Input features:</strong>
-              </p>
-              <ul className="list-disc list-inside text-sm text-muted-foreground ml-2 space-y-1">
-                {modelInfo.features.map((feature, i) => (
-                  <li key={i}>{feature}</li>
-                ))}
-              </ul>
-              <div className="mt-3">
-                <p className="text-sm">
-                  <strong>Accuracy:</strong> {modelInfo.accuracy}
-                </p>
-                <p className="text-sm">
-                  <strong>Training:</strong>{" "}
-                  {modelInfo.training.dataPointsFormatted || "150,000"} samples
-                  across {modelInfo.training.epochs} epochs
-                </p>
-                {modelInfo.dataset && (
-                  <p className="text-sm mt-2">
-                    <strong>Dataset:</strong> {modelInfo.dataset}
-                  </p>
-                )}
-                {modelInfo.citation && (
-                  <p className="text-xs text-muted-foreground mt-2">
-                    <strong>Citation:</strong> {modelInfo.citation}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-        </CardContent>
-        <CardFooter className="bg-muted/50 flex justify-between items-center">
-          <p className="text-xs text-muted-foreground flex items-center gap-1">
-            <AlertCircle className="h-3.5 w-3.5" />
-            {modelStatus === "ready"
-              ? "Machine learning model active"
-              : "Initializing ML model..."}
-          </p>
-        </CardFooter>
-      </Card>
     </div>
   );
 }
