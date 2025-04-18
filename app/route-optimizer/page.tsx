@@ -1319,25 +1319,30 @@ function RouteOptimizerContent() {
     </p>
   );
 
-  // Improved return statement with route info overlay at bottom of map
+  // Improved return statement with route info overlay at bottom of map and better mobile support
   return (
     // Add back the left padding (lg:pl-80) to accommodate the sidebar
-    <div className="p-8 pt-20 lg:pt-8 lg:pl-80">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Route Optimizer</h1>
-        <p className="text-muted-foreground">
+    <div className="px-4 py-6 pt-20 md:p-8 md:pt-20 lg:pt-8 lg:pl-80">
+      <div className="mb-6 md:mb-8">
+        <h1 className="text-2xl md:text-3xl font-bold mb-1 md:mb-2">
+          Route Optimizer
+        </h1>
+        <p className="text-sm text-muted-foreground">
           Find the cleanest routes with lowest air pollution exposure
         </p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3 relative">
-        <div className="lg:col-span-1 space-y-6">
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Route Planner</h3>
-            <div className="space-y-4">
+      <div className="grid gap-4 md:gap-6 lg:grid-cols-3 relative">
+        {/* Form card - full width on mobile, 1/3 width on desktop */}
+        <div className="lg:col-span-1 space-y-4 md:space-y-6 order-2 lg:order-1">
+          <Card className="p-4 md:p-6">
+            <h3 className="text-base md:text-lg font-semibold mb-3 md:mb-4">
+              Route Planner
+            </h3>
+            <div className="space-y-3 md:space-y-4">
               {/* Start Location Input */}
               <div>
-                <label className="text-sm font-medium mb-2 block">
+                <label className="text-sm font-medium mb-1.5 block">
                   Start Location
                 </label>
                 <div className="flex gap-2 relative">
@@ -1410,7 +1415,7 @@ function RouteOptimizerContent() {
                     <MapPin className="h-4 w-4" />
                   </Button>
                   {showStartSuggestions && startSuggestions.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg z-10">
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg z-10 max-h-[150px] overflow-y-auto">
                       {startSuggestions.map((suggestion) => (
                         <div
                           key={suggestion.id}
@@ -1429,7 +1434,7 @@ function RouteOptimizerContent() {
 
               {/* Destination Input */}
               <div>
-                <label className="text-sm font-medium mb-2 block">
+                <label className="text-sm font-medium mb-1.5 block">
                   Destination
                 </label>
                 <div className="flex gap-2 relative">
@@ -1455,7 +1460,7 @@ function RouteOptimizerContent() {
                     <MapPin className="h-4 w-4" />
                   </Button>
                   {showDestSuggestions && destSuggestions.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg z-10">
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg z-10 max-h-[150px] overflow-y-auto">
                       {destSuggestions.map((suggestion) => (
                         <div
                           key={suggestion.id}
@@ -1474,7 +1479,7 @@ function RouteOptimizerContent() {
 
               {/* Route Type Select */}
               <div>
-                <label className="text-sm font-medium mb-2 block">
+                <label className="text-sm font-medium mb-1.5 block">
                   Route Type
                 </label>
                 <Select
@@ -1488,7 +1493,7 @@ function RouteOptimizerContent() {
                     <SelectItem value="eco">
                       <div className="flex items-center">
                         <Leaf className="w-4 h-4 mr-2 text-green-500" />
-                        <span>Eco-Friendly (Lowest Emissions)</span>
+                        <span>Eco-Friendly</span>
                       </div>
                     </SelectItem>
                     <SelectItem value="fast">
@@ -1507,84 +1512,88 @@ function RouteOptimizerContent() {
                 </Select>
               </div>
 
-              {/* Add route type descriptions */}
-              <div className="mt-2 text-xs text-muted-foreground">
+              {/* Add route type descriptions - hidden on smallest screens */}
+              <div className="text-xs text-muted-foreground hidden sm:block">
                 {routeType === "eco" && (
                   <p>
-                    Eco-Friendly: Prioritizes routes with better air quality and
-                    lower emissions. Optimized for fuel efficiency and
-                    environmental impact.
+                    Prioritizes routes with better air quality and lower
+                    emissions. Optimized for fuel efficiency and environmental
+                    impact.
                   </p>
                 )}
                 {routeType === "fast" && (
                   <p>
-                    Fastest: Optimizes for the shortest travel time with
-                    real-time traffic data. Prefers major roads and highways for
-                    speed.
+                    Optimizes for shortest travel time with real-time traffic
+                    data. Prefers major roads and highways for speed.
                   </p>
                 )}
                 {routeType === "short" && (
                   <p>
-                    Shortest: Finds the most direct path with the minimum
-                    distance, regardless of traffic conditions or road type.
+                    Finds the most direct path with minimum distance, regardless
+                    of traffic conditions or road type.
                   </p>
                 )}
               </div>
 
-              {/* Calculate Route Button */}
-              <Button
-                onClick={calculateRoute}
-                disabled={!startLocation || !destination || isRouting}
-              >
-                {isRouting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Calculating...
-                  </>
-                ) : (
-                  "Calculate Route"
-                )}
-              </Button>
+              {/* Action Buttons - stacked on mobile, side by side on larger screens */}
+              <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                <Button
+                  className="w-full"
+                  onClick={calculateRoute}
+                  disabled={!startLocation || !destination || isRouting}
+                >
+                  {isRouting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Calculating...
+                    </>
+                  ) : (
+                    "Calculate Route"
+                  )}
+                </Button>
 
-              {/* Visualize Air Quality Button */}
-              <Button
-                variant="outline"
-                onClick={visualizeAirQuality}
-                disabled={!startLocation || !destination}
-              >
-                {isLoadingAirQuality ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Loading...
-                  </>
-                ) : (
-                  `${showAirQualityLayer ? "Hide" : "Show"} Air Quality`
-                )}
-              </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={visualizeAirQuality}
+                  disabled={!startLocation || !destination}
+                >
+                  {isLoadingAirQuality ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Loading...
+                    </>
+                  ) : (
+                    `${showAirQualityLayer ? "Hide" : "Show"} Air Quality`
+                  )}
+                </Button>
+              </div>
             </div>
           </Card>
         </div>
 
-        <div className="lg:col-span-2 relative">
-          {/* Map Card */}
-          <Card className="p-6 relative">
-            <h3 className="text-lg font-semibold mb-4">Route Map</h3>
+        {/* Map card - full width on mobile, 2/3 width on desktop */}
+        <div className="lg:col-span-2 relative order-1 lg:order-2">
+          <Card className="p-4 md:p-6 relative">
+            <h3 className="text-base md:text-lg font-semibold mb-3 md:mb-4">
+              Route Map
+            </h3>
             <div
               ref={mapRef}
-              className="h-[500px] rounded-lg"
+              className="h-[300px] md:h-[400px] lg:h-[500px] rounded-lg"
               style={{ width: "100%" }}
             >
               {!isMapLoaded && (
                 <div className="h-full w-full flex items-center justify-center border rounded-lg">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  <Loader2 className="h-6 w-6 md:h-8 md:w-8 animate-spin text-muted-foreground" />
                 </div>
               )}
 
               {/* Route info overlay at bottom of map */}
               {routeInfo && (
-                <div className="absolute bottom-4 left-4 right-4 p-3 rounded-md bg-background/95 backdrop-blur-sm shadow-lg border border-gray-200 z-10">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-sm font-semibold">
+                <div className="absolute bottom-4 left-4 right-4 p-2 md:p-3 rounded-md bg-background/95 backdrop-blur-sm shadow-lg border border-gray-200 z-10 text-xs md:text-sm">
+                  <div className="flex items-center justify-between mb-1 md:mb-2">
+                    <h3 className="font-semibold">
                       {routeType === "eco"
                         ? "Eco-Friendly Route"
                         : routeType === "fast"
@@ -1606,7 +1615,7 @@ function RouteOptimizerContent() {
                     </Badge>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div className="grid grid-cols-3 gap-1 md:gap-2 text-xs">
                     <div>
                       <span className="text-muted-foreground">Distance:</span>
                       <p className="font-medium">{routeInfo.distance} km</p>
@@ -1636,13 +1645,17 @@ function RouteOptimizerContent() {
                   </div>
 
                   {routeType === "eco" && environmentalStats.co2Saved > 0 && (
-                    <div className="flex justify-between mt-2 text-xs text-green-700">
+                    <div className="flex flex-col xs:flex-row xs:justify-between mt-2 text-xs text-green-700">
                       <span>CO₂ Saved: {environmentalStats.co2Saved} kg</span>
+                      <span className="hidden xs:inline">•</span>
                       <span>Fuel Saved: {environmentalStats.fuelSaved}L</span>
                       {environmentalStats.timeAdded > 0 && (
-                        <span>
-                          +{environmentalStats.timeAdded} min vs. fastest
-                        </span>
+                        <>
+                          <span className="hidden xs:inline">•</span>
+                          <span>
+                            +{environmentalStats.timeAdded} min vs. fastest
+                          </span>
+                        </>
                       )}
                     </div>
                   )}
@@ -1650,7 +1663,7 @@ function RouteOptimizerContent() {
               )}
             </div>
 
-            <div className="mt-3 text-xs text-muted-foreground">
+            <div className="mt-2 md:mt-3 text-xs text-muted-foreground">
               <p>
                 Map shows real-time traffic conditions with{" "}
                 <span className="text-amber-500 font-medium">
@@ -1672,9 +1685,9 @@ export default function RouteOptimizerPage() {
   return (
     <Suspense
       fallback={
-        <div className="p-8 pt-20 lg:pt-8 lg:pl-80">
-          <div className="flex items-center justify-center w-full h-[80vh]">
-            <Loader2 className="h-8 w-8 animate-spin" />
+        <div className="p-4 md:p-8 pt-20 lg:pt-8 lg:pl-80">
+          <div className="flex items-center justify-center w-full h-[60vh] md:h-[80vh]">
+            <Loader2 className="h-6 w-6 md:h-8 md:w-8 animate-spin" />
             <span className="ml-2">Loading route optimizer...</span>
           </div>
         </div>

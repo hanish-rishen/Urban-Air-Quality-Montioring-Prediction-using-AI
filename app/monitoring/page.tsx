@@ -433,7 +433,7 @@ export default function MonitoringPage() {
 
   if (loading) {
     return (
-      <div className="p-8 pt-20 lg:pt-8 flex items-center justify-center h-[80vh]">
+      <div className="px-4 py-6 pt-20 md:p-8 md:pt-20 lg:pt-8 lg:pl-80 flex items-center justify-center h-[80vh]">
         <div className="flex flex-col items-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <p className="mt-4">Loading air quality data...</p>
@@ -444,8 +444,8 @@ export default function MonitoringPage() {
 
   if (error) {
     return (
-      <div className="p-8 pt-20 lg:pt-8">
-        <Card className="p-6 bg-destructive/10">
+      <div className="px-4 py-6 pt-20 md:p-8 md:pt-20 lg:pt-8 lg:pl-80">
+        <Card className="p-4 md:p-6 bg-destructive/10">
           <div className="flex items-center gap-3 text-destructive">
             <AlertCircle className="h-5 w-5" />
             <h3 className="font-semibold">Error</h3>
@@ -457,31 +457,40 @@ export default function MonitoringPage() {
   }
 
   return (
-    // Add back the left padding (lg:pl-80) to accommodate the sidebar
-    <div className="p-8 pt-20 lg:pt-8 lg:pl-80">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Air Quality Monitoring</h1>
-        <p className="text-muted-foreground">
+    // Add responsive padding with better mobile optimization
+    <div className="px-4 py-6 pt-20 md:p-8 md:pt-20 lg:pt-8 lg:pl-80">
+      <div className="mb-6 md:mb-8">
+        <h1 className="text-2xl md:text-3xl font-bold mb-1 md:mb-2">
+          Air Quality Monitoring
+        </h1>
+        <p className="text-sm text-muted-foreground">
           Real-time air quality data and analysis
         </p>
       </div>
 
       {airQuality && (
         <>
-          <div className="grid gap-6 md:grid-cols-2 mb-6">
-            <Card className="p-6">
+          {/* Responsive grid with stacked cards on mobile */}
+          <div className="grid gap-4 md:gap-6 grid-cols-1 md:grid-cols-2 mb-6">
+            <Card className="p-4 md:p-6">
               <div className="flex flex-col items-center justify-center">
-                <h3 className="text-2xl font-semibold mb-2">Current AQI</h3>
-                <div className="flex items-center justify-center h-36 w-36 rounded-full bg-muted mb-4 relative">
-                  <span className="text-4xl font-bold">{airQuality.aqi}</span>
+                <h3 className="text-xl md:text-2xl font-semibold mb-2">
+                  Current AQI
+                </h3>
+                <div className="flex items-center justify-center h-28 w-28 md:h-36 md:w-36 rounded-full bg-muted mb-3 md:mb-4 relative">
+                  <span className="text-3xl md:text-4xl font-bold">
+                    {airQuality.aqi}
+                  </span>
                   <div
                     className={`absolute bottom-0 left-0 right-0 h-1.5 ${getAqiColor(
                       airQuality.aqi
                     )}`}
                   />
                 </div>
-                <h4 className="text-xl font-medium">{airQuality.level}</h4>
-                <p className="text-center text-muted-foreground mt-2">
+                <h4 className="text-lg md:text-xl font-medium">
+                  {airQuality.level}
+                </h4>
+                <p className="text-center text-muted-foreground mt-2 text-sm md:text-base">
                   {airQuality.description}
                 </p>
                 {airQuality.openWeatherAqi && (
@@ -490,27 +499,27 @@ export default function MonitoringPage() {
                   </p>
                 )}
 
-                {/* Pollutant Carousel */}
+                {/* Mobile optimized pollutant carousel */}
                 {components && (
-                  <div className="w-full mt-6">
+                  <div className="w-full mt-4 md:mt-6">
                     <div className="flex items-center justify-between mb-2">
                       <h5 className="text-sm font-semibold">Key Pollutants</h5>
                       <div className="flex gap-1">
                         <Button
                           size="icon"
                           variant="outline"
-                          className="h-7 w-7"
+                          className="h-6 w-6 md:h-7 md:w-7"
                           onClick={() => navigateCarousel("prev")}
                         >
-                          <ChevronLeft className="h-4 w-4" />
+                          <ChevronLeft className="h-3 w-3 md:h-4 md:w-4" />
                         </Button>
                         <Button
                           size="icon"
                           variant="outline"
-                          className="h-7 w-7"
+                          className="h-6 w-6 md:h-7 md:w-7"
                           onClick={() => navigateCarousel("next")}
                         >
-                          <ChevronRight className="h-4 w-4" />
+                          <ChevronRight className="h-3 w-3 md:h-4 md:w-4" />
                         </Button>
                       </div>
                     </div>
@@ -523,7 +532,7 @@ export default function MonitoringPage() {
                       {getVisiblePollutants().map(([key, comp]) => (
                         <div
                           key={key}
-                          className="min-w-[120px] flex-1 bg-muted rounded-lg p-3 relative overflow-hidden"
+                          className="min-w-[100px] sm:min-w-[120px] flex-1 bg-muted rounded-lg p-3 relative overflow-hidden"
                         >
                           <div
                             className={`absolute bottom-0 left-0 right-0 h-1 ${getPollutantColor(
@@ -531,10 +540,10 @@ export default function MonitoringPage() {
                               comp.value
                             )}`}
                           />
-                          <div className="font-semibold">
+                          <div className="font-semibold text-sm md:text-base">
                             {key.toUpperCase()}
                           </div>
-                          <div className="text-lg font-medium mt-1">
+                          <div className="text-base md:text-lg font-medium mt-1">
                             {comp.value}{" "}
                             <span className="text-xs text-muted-foreground">
                               {comp.unit}
@@ -552,24 +561,25 @@ export default function MonitoringPage() {
                   </div>
                 )}
 
-                <p className="text-sm text-muted-foreground mt-4">
+                <p className="text-xs md:text-sm text-muted-foreground mt-4">
                   Last updated:{" "}
                   {new Date(airQuality.timestamp).toLocaleTimeString()}
                 </p>
               </div>
             </Card>
 
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold mb-4">
+            {/* Components card optimized for mobile */}
+            <Card className="p-4 md:p-6">
+              <h3 className="text-base md:text-lg font-semibold mb-3 md:mb-4">
                 Air Quality Components
               </h3>
               {components && (
-                <div className="space-y-4">
+                <div className="space-y-3 md:space-y-4">
                   {Object.entries(components).map(([key, comp]) => (
-                    <div key={key} className="space-y-2">
-                      <div className="flex justify-between items-center">
+                    <div key={key} className="space-y-1 md:space-y-2">
+                      <div className="flex justify-between items-center text-sm md:text-base">
                         <span>{comp.name}</span>
-                        <span className="text-sm font-medium">
+                        <span className="text-xs md:text-sm font-medium">
                           {comp.value} {comp.unit}
                         </span>
                       </div>
@@ -578,7 +588,7 @@ export default function MonitoringPage() {
                           100,
                           (comp.value / getMaxValueForComponent(key)) * 100
                         )}
-                        className="h-2"
+                        className="h-1.5 md:h-2"
                       />
                     </div>
                   ))}
@@ -587,13 +597,15 @@ export default function MonitoringPage() {
             </Card>
           </div>
 
-          {/* AQI Trend chart */}
-          <div className="mt-6 mb-8">
+          {/* AQI Trend chart with responsive height */}
+          <div className="mt-4 md:mt-6 mb-6 md:mb-8">
             <div className="mb-2">
-              <h2 className="text-xl font-semibold">Air Quality Trend</h2>
+              <h2 className="text-lg md:text-xl font-semibold">
+                Air Quality Trend
+              </h2>
             </div>
             {lastUpdateTime && (
-              <p className="text-sm text-muted-foreground mb-4">
+              <p className="text-xs md:text-sm text-muted-foreground mb-3 md:mb-4">
                 Last updated: {lastUpdateTime} · Data refreshes automatically
                 every minute
               </p>
@@ -610,13 +622,15 @@ export default function MonitoringPage() {
                   to: "hsl(var(--background))",
                 },
               }}
-              height={300}
+              height={window.innerWidth < 768 ? 220 : 300}
             />
           </div>
 
-          {/* News section */}
-          <div className="mt-8">
-            <h2 className="text-xl font-semibold mb-4">News & Resources</h2>
+          {/* News section with better mobile spacing */}
+          <div className="mt-6 md:mt-8">
+            <h2 className="text-lg md:text-xl font-semibold mb-3 md:mb-4">
+              News & Resources
+            </h2>
             <NewsSection location={location} />
           </div>
         </>

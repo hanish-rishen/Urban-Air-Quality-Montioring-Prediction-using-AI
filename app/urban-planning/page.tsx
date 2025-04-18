@@ -18,6 +18,9 @@ import {
   Search, // Add Search icon
   X, // Add X icon for clearing search
   MapPin, // Add MapPin icon
+  Menu, // Add Menu icon for mobile sidebar toggle
+  ChevronDown, // Add ChevronDown for expandable sections
+  ChevronUp, // Add ChevronUp for expandable sections
 } from "lucide-react";
 import { Input } from "@/components/ui/input"; // Add Input component
 import {
@@ -35,6 +38,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import ReactMarkdown from "react-markdown"; // Import react-markdown
@@ -91,6 +101,36 @@ export default function UrbanPlanningPage() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState<boolean>(false);
   const [showSearchResults, setShowSearchResults] = useState<boolean>(false);
+
+  // Add state for mobile UI
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [expandedSection, setExpandedSection] = useState<string | null>(
+    "tools"
+  ); // Default expanded section
+
+  // Function to toggle section expansion on mobile
+  const toggleSection = (section: string) => {
+    setExpandedSection(expandedSection === section ? null : section);
+  };
+
+  // Calculate if we're on a mobile device
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Check screen size on mount and when resized
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    // Initial check
+    checkScreenSize();
+
+    // Listen for resize events
+    window.addEventListener("resize", checkScreenSize);
+
+    // Cleanup
+    return () => window.removeEventListener("resize", checkScreenSize);
+  }, []);
 
   // Debounce effect for search query
   useEffect(() => {
@@ -889,6 +929,11 @@ Based on the elevation of ${areaData.topology?.elevation}m with ${areaData.topol
         setShowSearchResults(true); // Show results after search button click
         // Optionally, automatically select the first result:
         // goToSearchResult(data.results[0]);
+
+        // On mobile, automatically select first result to save space
+        if (isMobile && data.results[0]) {
+          goToSearchResult(data.results[0]);
+        }
       } else {
         setSearchResults([]);
         setShowSearchResults(false);
@@ -927,11 +972,12 @@ Based on the elevation of ${areaData.topology?.elevation}m with ${areaData.topol
         return;
       }
 
-      // Fly to the search result location
+      // Fly to the search result location - adjust padding for mobile
       map.current.flyTo({
         center: [lon, lat],
         zoom: 15,
         duration: 1000,
+        padding: isMobile ? { bottom: 100, top: 50 } : undefined,
       });
 
       // Get best address display
@@ -947,6 +993,11 @@ Based on the elevation of ${areaData.topology?.elevation}m with ${areaData.topol
       // Clear search results after selection
       setShowSearchResults(false);
       setSearchQuery(address);
+
+      // Close sidebar on mobile after selecting location
+      if (isMobile) {
+        setIsSidebarOpen(false);
+      }
     } catch (error) {
       console.error("Error navigating to search result:", error);
     }
@@ -968,7 +1019,6 @@ Based on the elevation of ${areaData.topology?.elevation}m with ${areaData.topol
     markerElement.style.position = "relative";
 
     const markerPin = document.createElement("div");
-    markerPin.className = "marker-pin";
     markerPin.innerHTML = `<svg width="30" height="30" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M12 13V13.01M12 22L5.5 15.5C4.83333 14.8333 4.33333 14.0833 4 13.25C3.66667 12.4167 3.5 11.5 3.5 10.5C3.5 8.5 4.16667 6.83333 5.5 5.5C6.83333 4.16667 8.5 3.5 10.5 3.5C12.5 3.5 14.1667 4.16667 15.5 5.5C16.8333 6.83333 17.5 8.5 17.5 10.5C17.5 11.5 17.3333 12.4167 17 13.25C16.6667 14.0833 16.1667 14.8333 15.5 15.5L9 22" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
     </svg>`;
@@ -1001,20 +1051,286 @@ Based on the elevation of ${areaData.topology?.elevation}m with ${areaData.topol
   // --- Render Logic ---
   return (
     <>
-      {/* Use pl-80 for large screens to accommodate sidebar */}
-      {/* Modify the main container to use flexbox */}
-      <div className="p-8 pt-20 lg:pt-8 lg:pl-80 h-screen overflow-hidden bg-background flex flex-col">
-        <div className="mb-8 flex-shrink-0">
-          {/* Ensure header doesn't grow */}
-          <h1 className="text-3xl font-bold mb-2">Urban Planning</h1>
-          <p className="text-muted-foreground">
-            Analyze areas and get AI-driven recommendations for sustainable
-            development.
-          </p>
+      {/* Mobile-optimized layout - adjusted for existing sidebar */}
+      <div className="h-screen overflow-hidden bg-background flex flex-col pt-20 lg:pt-8 lg:pl-72">
+        {/* Page header - adjusted for mobile sidebar */}
+        <div className="p-4 md:p-8 flex-shrink-0 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold">Urban Planning</h1>
+            <p className="text-sm text-muted-foreground hidden md:block">
+              Analyze areas and get AI-driven recommendations for sustainable
+              development.
+            </p>
+          </div>
+
+          {/* Tools sidebar trigger for mobile - only shows tools sheet */}
+          <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="sm" className="md:hidden">
+                <Map className="h-4 w-4 mr-2" />
+                <span>Tools</span>
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-[85%] sm:w-[350px] p-0">
+              <SheetHeader className="p-4 border-b">
+                <SheetTitle>Urban Planning Tools</SheetTitle>
+              </SheetHeader>
+              <ScrollArea className="h-[calc(100vh-80px)] px-4 py-2">
+                {/* Mobile Search */}
+                <div className="mb-4 sticky top-0 bg-background pt-2 pb-4 z-10">
+                  <div className="flex gap-2 items-center relative w-full">
+                    <Input
+                      type="text"
+                      placeholder="Search location..."
+                      value={searchQuery}
+                      onChange={(e) => {
+                        setSearchQuery(e.target.value);
+                      }}
+                      onFocus={() => {
+                        if (searchResults.length > 0 && searchQuery.trim()) {
+                          setShowSearchResults(true);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          searchLocation(searchQuery);
+                        }
+                        if (e.key === "Escape") {
+                          setShowSearchResults(false);
+                        }
+                      }}
+                      className="pl-10"
+                    />
+                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
+                      <Search className="h-4 w-4" />
+                    </span>
+                    {searchQuery && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-10 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
+                        onClick={() => {
+                          setSearchQuery("");
+                          setSearchResults([]);
+                          setShowSearchResults(false);
+                        }}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
+                    <Button
+                      variant="default"
+                      size="sm"
+                      disabled={!searchQuery.trim() || isSearching}
+                      onClick={() => searchLocation(searchQuery)}
+                    >
+                      {isSearching ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        "Search"
+                      )}
+                    </Button>
+                  </div>
+
+                  {/* Mobile Search Results */}
+                  {showSearchResults && searchResults.length > 0 && (
+                    <div className="mt-1 bg-background border rounded-md shadow-lg max-h-60 overflow-y-auto">
+                      {searchResults.map((result, index) => (
+                        <div
+                          key={index}
+                          className="px-3 py-2 hover:bg-accent cursor-pointer flex items-center gap-2"
+                          onClick={() => {
+                            goToSearchResult(result);
+                            setIsSidebarOpen(false); // Close sidebar after selection
+                          }}
+                        >
+                          <MapPin className="h-4 w-4 flex-shrink-0 text-primary" />
+                          <div>
+                            <p className="text-sm font-medium">
+                              {result.poi?.name ||
+                                result.address?.freeformAddress}
+                            </p>
+                            {result.poi?.name && (
+                              <p className="text-xs text-muted-foreground">
+                                {result.address?.freeformAddress}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Mobile Tool Sections */}
+                <div className="space-y-4">
+                  {/* GIS Tools Section - Expandable on Mobile */}
+                  <Card>
+                    <CardHeader
+                      className="py-3 cursor-pointer"
+                      onClick={() => toggleSection("tools")}
+                    >
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-sm font-medium">
+                          GIS Tools
+                        </CardTitle>
+                        {expandedSection === "tools" ? (
+                          <ChevronUp className="h-4 w-4" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4" />
+                        )}
+                      </div>
+                    </CardHeader>
+                    {expandedSection === "tools" && (
+                      <CardContent className="px-3 pb-3 pt-0">
+                        <div className="space-y-1">
+                          <Button
+                            variant={
+                              activeToolGroup === "select"
+                                ? "secondary"
+                                : "ghost"
+                            }
+                            className="w-full justify-start"
+                            onClick={() => {
+                              handleToolSelect("select");
+                              setIsSidebarOpen(false);
+                            }}
+                            size="sm"
+                            disabled={drawingMode.active}
+                          >
+                            <MousePointer className="h-4 w-4 mr-2" />
+                            <span>Select / Pan</span>
+                          </Button>
+                          <Button
+                            variant={
+                              activeToolGroup === "draw" ? "secondary" : "ghost"
+                            }
+                            className="w-full justify-start"
+                            onClick={() => {
+                              handleToolSelect("draw");
+                              setIsSidebarOpen(false);
+                            }}
+                            size="sm"
+                          >
+                            <Pencil className="h-4 w-4 mr-2" />
+                            <span>Draw Polygon</span>
+                          </Button>
+                          <Button
+                            variant={
+                              activeToolGroup === "zoom" ? "secondary" : "ghost"
+                            }
+                            className="w-full justify-start"
+                            onClick={() => {
+                              handleToolSelect("zoom");
+                              setIsSidebarOpen(false);
+                            }}
+                            size="sm"
+                            disabled={!selectedArea || drawingMode.active}
+                          >
+                            <Maximize className="h-4 w-4 mr-2" />
+                            <span>Zoom to Selection</span>
+                          </Button>
+                        </div>
+                      </CardContent>
+                    )}
+                  </Card>
+
+                  {/* Layers Section - Expandable on Mobile */}
+                  <Card>
+                    <CardHeader
+                      className="py-3 cursor-pointer"
+                      onClick={() => toggleSection("layers")}
+                    >
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-sm font-medium">
+                          Layers
+                        </CardTitle>
+                        {expandedSection === "layers" ? (
+                          <ChevronUp className="h-4 w-4" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4" />
+                        )}
+                      </div>
+                    </CardHeader>
+                    {expandedSection === "layers" && (
+                      <CardContent className="px-3 pb-3 pt-0 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label
+                            htmlFor="traffic-toggle-mobile"
+                            className="text-sm flex items-center gap-2"
+                          >
+                            <Layers className="h-4 w-4" /> Traffic
+                          </label>
+                          <input
+                            type="checkbox"
+                            id="traffic-toggle-mobile"
+                            checked={showTraffic}
+                            onChange={() => toggleLayer("traffic")}
+                            className="form-checkbox h-5 w-5 text-primary rounded" // Larger checkbox for mobile
+                          />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <label
+                            htmlFor="buildings-toggle-mobile"
+                            className="text-sm flex items-center gap-2"
+                          >
+                            <Building2 className="h-4 w-4" /> Buildings
+                          </label>
+                          <input
+                            type="checkbox"
+                            id="buildings-toggle-mobile"
+                            checked={showBuildings}
+                            onChange={() => toggleLayer("buildings")}
+                            className="form-checkbox h-5 w-5 text-primary rounded" // Larger checkbox for mobile
+                          />
+                        </div>
+                      </CardContent>
+                    )}
+                  </Card>
+
+                  {/* Instructions Section - Expandable on Mobile */}
+                  <Card className="bg-muted/50">
+                    <CardHeader
+                      className="py-3 cursor-pointer"
+                      onClick={() => toggleSection("instructions")}
+                    >
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-sm font-medium">
+                          Instructions
+                        </CardTitle>
+                        {expandedSection === "instructions" ? (
+                          <ChevronUp className="h-4 w-4" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4" />
+                        )}
+                      </div>
+                    </CardHeader>
+                    {expandedSection === "instructions" && (
+                      <CardContent className="px-3 pb-3 pt-0 text-xs text-muted-foreground space-y-1">
+                        <p>Select a tool to interact with the map.</p>
+                        <p>
+                          <strong>Draw Polygon:</strong> Tap to add points,
+                          two-finger tap to finish (min 3 points).
+                        </p>
+                        <p>
+                          <strong>Select/Pan:</strong> Drag map. Tap drawn
+                          feature to re-analyze.
+                        </p>
+                        <p>
+                          <strong>Note:</strong> Panning is disabled while
+                          drawing.
+                        </p>
+                      </CardContent>
+                    )}
+                  </Card>
+                </div>
+              </ScrollArea>
+            </SheetContent>
+          </Sheet>
         </div>
 
-        {/* Add search bar above the map */}
-        <div className="mb-4 flex-shrink-0">
+        {/* Desktop search bar */}
+        <div className="px-4 mb-4 md:px-8 flex-shrink-0">
           <div className="flex gap-2 items-center relative w-full max-w-md">
             <Input
               type="text"
@@ -1022,23 +1338,21 @@ Based on the elevation of ${areaData.topology?.elevation}m with ${areaData.topol
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
-                // Remove direct call to fetchLocationSuggestions here
               }}
               onFocus={() => {
-                // Show suggestions if they exist and query is not empty
                 if (searchResults.length > 0 && searchQuery.trim()) {
                   setShowSearchResults(true);
                 }
               }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
-                  searchLocation(searchQuery); // Trigger direct search on Enter
+                  searchLocation(searchQuery);
                 }
                 if (e.key === "Escape") {
                   setShowSearchResults(false);
                 }
               }}
-              className="pl-10" // Space for the search icon
+              className="pl-10"
             />
             <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
               <Search className="h-4 w-4" />
@@ -1097,14 +1411,12 @@ Based on the elevation of ${areaData.topology?.elevation}m with ${areaData.topol
           </div>
         </div>
 
-        {/* Make the grid container grow to fill remaining space */}
-        <div className="grid grid-cols-12 gap-6 flex-grow min-h-0">
-          {/* Add flex-grow and min-h-0 */}
-          {/* Left sidebar for tools - Increase width */}
-          <ScrollArea className="col-span-3 h-full">
-            {/* Changed from col-span-2 to col-span-3 */}
+        {/* Responsive layout grid - with sidebar adjusted for desktop/mobile */}
+        <div className="grid md:grid-cols-12 gap-4 flex-grow min-h-0 px-4 md:px-8 pb-4 md:pb-8">
+          {/* Desktop-only tools sidebar */}
+          <ScrollArea className="hidden md:block md:col-span-3 h-full">
             <div className="space-y-4 pr-4">
-              {/* Add padding to prevent content touching scrollbar */}
+              {/* Desktop tools sidebar content (unchanged) */}
               <Card>
                 <CardHeader className="py-3">
                   <CardTitle className="text-sm font-medium">
@@ -1113,7 +1425,6 @@ Based on the elevation of ${areaData.topology?.elevation}m with ${areaData.topol
                 </CardHeader>
                 <CardContent className="px-3 pb-3 pt-0">
                   <div className="space-y-1">
-                    {/* Select Tool */}
                     <Button
                       variant={
                         activeToolGroup === "select" ? "secondary" : "ghost"
@@ -1121,12 +1432,11 @@ Based on the elevation of ${areaData.topology?.elevation}m with ${areaData.topol
                       className="w-full justify-start"
                       onClick={() => handleToolSelect("select")}
                       size="sm"
-                      disabled={drawingMode.active} // Only check drawing mode now
+                      disabled={drawingMode.active}
                     >
                       <MousePointer className="h-4 w-4 mr-2" />
                       <span>Select / Pan</span>
                     </Button>
-                    {/* Drawing Tools */}
                     <Button
                       variant={
                         activeToolGroup === "draw" ? "secondary" : "ghost"
@@ -1138,8 +1448,6 @@ Based on the elevation of ${areaData.topology?.elevation}m with ${areaData.topol
                       <Pencil className="h-4 w-4 mr-2" />
                       <span>Draw Polygon</span>
                     </Button>
-                    {/* Remove Measurement Tools dropdown */}
-                    {/* Zoom Tool */}
                     <Button
                       variant={
                         activeToolGroup === "zoom" ? "secondary" : "ghost"
@@ -1155,7 +1463,7 @@ Based on the elevation of ${areaData.topology?.elevation}m with ${areaData.topol
                   </div>
                 </CardContent>
               </Card>
-              {/* Layer Control */}
+
               <Card>
                 <CardHeader className="py-3">
                   <CardTitle className="text-sm font-medium">Layers</CardTitle>
@@ -1163,14 +1471,14 @@ Based on the elevation of ${areaData.topology?.elevation}m with ${areaData.topol
                 <CardContent className="px-3 pb-3 pt-0 space-y-2">
                   <div className="flex items-center justify-between">
                     <label
-                      htmlFor="traffic-toggle"
+                      htmlFor="traffic-toggle-desktop"
                       className="text-sm flex items-center gap-2"
                     >
                       <Layers className="h-4 w-4" /> Traffic
                     </label>
                     <input
                       type="checkbox"
-                      id="traffic-toggle"
+                      id="traffic-toggle-desktop"
                       checked={showTraffic}
                       onChange={() => toggleLayer("traffic")}
                       className="form-checkbox h-4 w-4 text-primary rounded"
@@ -1178,14 +1486,14 @@ Based on the elevation of ${areaData.topology?.elevation}m with ${areaData.topol
                   </div>
                   <div className="flex items-center justify-between">
                     <label
-                      htmlFor="buildings-toggle"
+                      htmlFor="buildings-toggle-desktop"
                       className="text-sm flex items-center gap-2"
                     >
                       <Building2 className="h-4 w-4" /> Buildings
                     </label>
                     <input
                       type="checkbox"
-                      id="buildings-toggle"
+                      id="buildings-toggle-desktop"
                       checked={showBuildings}
                       onChange={() => toggleLayer("buildings")}
                       className="form-checkbox h-4 w-4 text-primary rounded"
@@ -1193,7 +1501,7 @@ Based on the elevation of ${areaData.topology?.elevation}m with ${areaData.topol
                   </div>
                 </CardContent>
               </Card>
-              {/* Tool Instructions Card - UPDATE TEXT */}
+
               <Card className="bg-muted/50">
                 <CardHeader className="py-3">
                   <CardTitle className="text-sm font-medium">
@@ -1217,13 +1525,10 @@ Based on the elevation of ${areaData.topology?.elevation}m with ${areaData.topol
               </Card>
             </div>
           </ScrollArea>
-          {/* Main map area */}
-          <div className="col-span-9 relative">
-            {/* Changed from col-span-10 to col-span-9 */}
-            {/* Ensure map container fills its grid cell */}
+
+          {/* Main map area - Full width on mobile */}
+          <div className="col-span-12 md:col-span-9 relative h-full">
             <Card className="h-full w-full">
-              {" "}
-              {/* Make card fill the container */}
               <div ref={mapRef} className="h-full w-full rounded-md"></div>
               {/* Loading overlay for map */}
               {!isMapLoaded && (
@@ -1243,200 +1548,224 @@ Based on the elevation of ${areaData.topology?.elevation}m with ${areaData.topol
                   </div>
                 </div>
               )}
-              {/* Tool instructions overlay - UPDATE TEXT */}
+              {/* Tool instructions overlay - position more centered on mobile */}
               {drawingMode.active && (
-                <div className="absolute bottom-4 left-4 right-4 p-3 bg-background/95 rounded-md shadow border z-10">
+                <div className="absolute bottom-16 md:bottom-4 left-4 right-4 p-3 bg-background/95 rounded-md shadow border z-10 text-center">
                   <p className="text-sm">
-                    Click to add polygon points. Right-click to finish (min 3
-                    points).
+                    {isMobile
+                      ? "Tap to add points. Two-finger tap to finish (min 3 points)."
+                      : "Click to add polygon points. Right-click to finish (min 3 points)."}
                   </p>
                 </div>
               )}
             </Card>
           </div>
         </div>
-        {/* Analysis Dialog */}
+
+        {/* Mobile quick tools - simplified to avoid duplication */}
+        <div className="md:hidden fixed bottom-4 right-4 z-20 flex flex-col gap-2">
+          <Button
+            variant={activeToolGroup === "select" ? "secondary" : "default"}
+            size="icon"
+            onClick={() => handleToolSelect("select")}
+            disabled={drawingMode.active}
+            className="rounded-full h-12 w-12 shadow-lg"
+            title="Pan"
+          >
+            <MousePointer className="h-5 w-5" />
+          </Button>
+          <Button
+            variant={activeToolGroup === "draw" ? "secondary" : "default"}
+            size="icon"
+            onClick={() => handleToolSelect("draw")}
+            className="rounded-full h-12 w-12 shadow-lg"
+            title="Draw"
+          >
+            <Pencil className="h-5 w-5" />
+          </Button>
+        </div>
+
+        {/* Analysis Dialog - Modified for better mobile experience */}
         <Dialog open={analysisDialogOpen} onOpenChange={setAnalysisDialogOpen}>
-          <DialogContent className="sm:max-w-2xl z-[60]">
+          <DialogContent className="sm:max-w-2xl z-[60] w-[95%] max-h-[90vh] overflow-hidden">
             <DialogHeader>
               <DialogTitle>Area Analysis & Recommendations</DialogTitle>
-              <DialogDescription>
+              <DialogDescription className="hidden md:block">
                 Urban planning data and AI recommendations for the selected
                 area.
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
-              {" "}
-              {/* Scrollable content */}
-              {/* Area Data */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Topology Card */}
-                <Card className="p-3">
-                  <CardHeader className="p-2 pb-0">
-                    <CardTitle className="text-sm">Topology</CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-2 pt-0">
-                    {areaData.topology ? (
-                      <div className="text-sm space-y-1">
-                        <p>Elevation: {areaData.topology.elevation ?? "N/A"}</p>
-                        <p>Terrain: {areaData.topology.terrain ?? "N/A"}</p>
-                        <p>
-                          Water bodies: {areaData.topology.waterBodies ?? "N/A"}
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="text-sm text-muted-foreground">
-                        Loading...
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-                {/* Density Card */}
-                <Card className="p-3">
-                  <CardHeader className="p-2 pb-0">
-                    <CardTitle className="text-sm">
-                      Population Density
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-2 pt-0">
-                    {areaData.density !== undefined ? (
-                      <div className="text-sm">
-                        <p>{areaData.density} people/km²</p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {areaData.density > 5000
-                            ? "High density"
-                            : areaData.density > 1000
-                            ? "Medium density"
-                            : "Low density"}
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="text-sm text-muted-foreground">
-                        Loading...
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-                {/* Air Quality Card */}
-                <Card className="p-3">
-                  <CardHeader className="p-2 pb-0">
-                    <CardTitle className="text-sm">Air Quality</CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-2 pt-0">
-                    {areaData.airQuality && !areaData.airQuality.error ? (
-                      <div className="text-sm space-y-1">
-                        <div className="flex items-center">
-                          <div
-                            className="w-3 h-3 rounded-full mr-2 flex-shrink-0"
-                            style={{
-                              backgroundColor:
-                                areaData.airQuality.aqi <= 50
-                                  ? "#10b981" // Green
-                                  : areaData.airQuality.aqi <= 100
-                                  ? "#f59e0b" // Yellow
-                                  : areaData.airQuality.aqi <= 150
-                                  ? "#f97316" // Orange
-                                  : areaData.airQuality.aqi <= 200
-                                  ? "#ef4444" // Red
-                                  : areaData.airQuality.aqi <= 300
-                                  ? "#8b5cf6" // Purple
-                                  : "#831843", // Maroon
-                            }}
-                          ></div>
-                          <span>
-                            AQI: {areaData.airQuality.aqi} (
-                            {areaData.airQuality.level}).
-                          </span>
-                        </div>
-                        {areaData.airQuality.components && (
-                          <p className="text-xs">
-                            PM2.5:{" "}
-                            {areaData.airQuality.components.pm2_5 ?? "N/A"}{" "}
-                            μg/m³
+            <ScrollArea className="max-h-[calc(90vh-120px)] pr-2">
+              <div className="space-y-4 py-4">
+                {/* Area Data - Stack vertically on mobile */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {/* Topology Card */}
+                  <Card className="p-3">
+                    <CardHeader className="p-2 pb-0">
+                      <CardTitle className="text-sm">Topology</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-2 pt-0">
+                      {areaData.topology ? (
+                        <div className="text-sm space-y-1">
+                          <p>
+                            Elevation: {areaData.topology.elevation ?? "N/A"}
                           </p>
-                        )}
-                      </div>
-                    ) : areaData.airQuality?.error ? (
-                      <div className="text-sm text-destructive flex items-center gap-1">
-                        <AlertCircle className="h-4 w-4" /> Error loading AQI
-                      </div>
-                    ) : (
-                      <div className="text-sm text-muted-foreground">
-                        Loading...
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-              {/* AI Recommendations */}
-              <div className="mt-4">
-                <h3 className="text-sm font-medium mb-2">
-                  AI Planning Recommendations
-                </h3>
-                {!recommendations && !isLoadingRecommendations && (
-                  <Button
-                    onClick={getUrbanPlanningRecommendations}
-                    disabled={
-                      !areaData.airQuality || !!areaData.airQuality.error
-                    } // Disable if no AQ data
-                  >
-                    Get AI Recommendations
-                  </Button>
-                )}
-
-                {isLoadingRecommendations && (
-                  <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Generating recommendations...</span>
-                  </div>
-                )}
-
-                {recommendations && (
-                  <Card className="p-4 bg-muted/30">
-                    {/* Use ScrollArea if content might be long */}
-                    {/* <ScrollArea className="h-[300px]"> */}
-                    <div
-                      className="prose prose-sm dark:prose-invert max-w-none"
-                      // Replace dangerouslySetInnerHTML with ReactMarkdown
-                    >
-                      <ReactMarkdown>{recommendations}</ReactMarkdown>
-                    </div>
-                    {/* </ScrollArea> */}
-                    <p className="text-xs text-muted-foreground mt-3 italic">
-                      AI-generated recommendations based on provided data.
-                      Verify with domain experts.
-                    </p>
+                          <p>Terrain: {areaData.topology.terrain ?? "N/A"}</p>
+                          <p>
+                            Water bodies:{" "}
+                            {areaData.topology.waterBodies ?? "N/A"}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="text-sm text-muted-foreground">
+                          Loading...
+                        </div>
+                      )}
+                    </CardContent>
                   </Card>
-                )}
-                {!isLoadingRecommendations &&
-                  !recommendations &&
-                  areaData.airQuality?.error && (
-                    <p className="text-sm text-destructive mt-2">
-                      Cannot generate recommendations due to missing air quality
-                      data.
-                    </p>
+                  {/* Density Card */}
+                  <Card className="p-3">
+                    <CardHeader className="p-2 pb-0">
+                      <CardTitle className="text-sm">
+                        Population Density
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-2 pt-0">
+                      {areaData.density !== undefined ? (
+                        <div className="text-sm">
+                          <p>{areaData.density} people/km²</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {areaData.density > 5000
+                              ? "High density"
+                              : areaData.density > 1000
+                              ? "Medium density"
+                              : "Low density"}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="text-sm text-muted-foreground">
+                          Loading...
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                  {/* Air Quality Card */}
+                  <Card className="p-3">
+                    <CardHeader className="p-2 pb-0">
+                      <CardTitle className="text-sm">Air Quality</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-2 pt-0">
+                      {areaData.airQuality && !areaData.airQuality.error ? (
+                        <div className="text-sm space-y-1">
+                          <div className="flex items-center">
+                            <div
+                              className="w-3 h-3 rounded-full mr-2 flex-shrink-0"
+                              style={{
+                                backgroundColor:
+                                  areaData.airQuality.aqi <= 50
+                                    ? "#10b981" // Green
+                                    : areaData.airQuality.aqi <= 100
+                                    ? "#f59e0b" // Yellow
+                                    : areaData.airQuality.aqi <= 150
+                                    ? "#f97316" // Orange
+                                    : areaData.airQuality.aqi <= 200
+                                    ? "#ef4444" // Red
+                                    : areaData.airQuality.aqi <= 300
+                                    ? "#8b5cf6" // Purple
+                                    : "#831843", // Maroon
+                              }}
+                            ></div>
+                            <span>
+                              AQI: {areaData.airQuality.aqi} (
+                              {areaData.airQuality.level}).
+                            </span>
+                          </div>
+                          {areaData.airQuality.components && (
+                            <p className="text-xs">
+                              PM2.5:{" "}
+                              {areaData.airQuality.components.pm2_5 ?? "N/A"}{" "}
+                              μg/m³
+                            </p>
+                          )}
+                        </div>
+                      ) : areaData.airQuality?.error ? (
+                        <div className="text-sm text-destructive flex items-center gap-1">
+                          <AlertCircle className="h-4 w-4" /> Error loading AQI
+                        </div>
+                      ) : (
+                        <div className="text-sm text-muted-foreground">
+                          Loading...
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+                {/* AI Recommendations */}
+                <div className="mt-4">
+                  <h3 className="text-sm font-medium mb-2">
+                    AI Planning Recommendations
+                  </h3>
+                  {!recommendations && !isLoadingRecommendations && (
+                    <Button
+                      onClick={getUrbanPlanningRecommendations}
+                      disabled={
+                        !areaData.airQuality || !!areaData.airQuality.error
+                      } // Disable if no AQ data
+                      className="w-full md:w-auto" // Full width on mobile
+                    >
+                      Get AI Recommendations
+                    </Button>
                   )}
+
+                  {isLoadingRecommendations && (
+                    <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Generating recommendations...</span>
+                    </div>
+                  )}
+
+                  {recommendations && (
+                    <Card className="p-4 bg-muted/30">
+                      <div className="prose prose-sm dark:prose-invert max-w-none">
+                        <ReactMarkdown>{recommendations}</ReactMarkdown>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-3 italic">
+                        AI-generated recommendations based on provided data.
+                        Verify with domain experts.
+                      </p>
+                    </Card>
+                  )}
+                  {!isLoadingRecommendations &&
+                    !recommendations &&
+                    areaData.airQuality?.error && (
+                      <p className="text-sm text-destructive mt-2">
+                        Cannot generate recommendations due to missing air
+                        quality data.
+                      </p>
+                    )}
+                </div>
               </div>
-            </div>
-            <DialogFooter>
+            </ScrollArea>
+            <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0">
               <Button
                 variant="outline"
                 onClick={() => setAnalysisDialogOpen(false)}
+                className="w-full sm:w-auto"
               >
                 Close
               </Button>
               <Button
                 variant="destructive"
                 onClick={() => {
-                  // Reset selection and clear drawings
                   setSelectedArea(null);
                   setAreaData({});
                   setRecommendations("");
                   setAnalysisDialogOpen(false);
-                  clearExistingDrawings(); // Clear visual representation
+                  clearExistingDrawings();
                 }}
+                className="w-full sm:w-auto"
               >
-                Clear Selection & Drawings
+                Clear Selection
               </Button>
             </DialogFooter>
           </DialogContent>

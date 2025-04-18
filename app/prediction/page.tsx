@@ -411,10 +411,12 @@ export default function PredictionPage() {
 
   return (
     // Add back the left padding (lg:pl-80) to accommodate the sidebar
-    <div className="p-8 pt-20 lg:pt-8 lg:pl-80">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Air Quality Prediction</h1>
-        <p className="text-muted-foreground">
+    <div className="px-4 py-6 pt-20 md:p-8 md:pt-20 lg:pt-8 lg:pl-80">
+      <div className="mb-6 md:mb-8">
+        <h1 className="text-2xl md:text-3xl font-bold mb-1 md:mb-2">
+          Air Quality Prediction
+        </h1>
+        <p className="text-sm text-muted-foreground">
           Forecast and analyze future air quality patterns using machine
           learning
         </p>
@@ -468,7 +470,7 @@ export default function PredictionPage() {
         <CardContent className="pt-6">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-grow flex gap-2 items-center relative">
-              <MapPin className="h-5 w-5 text-muted-foreground" />
+              <MapPin className="h-5 w-5 text-muted-foreground absolute left-3 top-1/2 transform -translate-y-1/2" />
               <Input
                 value={location}
                 onChange={(e) => {
@@ -480,13 +482,14 @@ export default function PredictionPage() {
                     setShowLocationSuggestions(true);
                 }}
                 placeholder="Enter location"
-                className="flex-grow"
+                className="flex-grow pl-10"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") searchLocation();
+                  if (e.key === "Escape") setShowLocationSuggestions(false);
                 }}
               />
               {showLocationSuggestions && locationSuggestions.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg z-50">
+                <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg z-50 max-h-52 overflow-y-auto">
                   {locationSuggestions.map((suggestion) => (
                     <div
                       key={suggestion.id}
@@ -503,6 +506,7 @@ export default function PredictionPage() {
               <Button
                 onClick={searchLocation}
                 disabled={refreshing || !location}
+                className="w-full sm:w-auto"
               >
                 {refreshing ? (
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -513,6 +517,7 @@ export default function PredictionPage() {
                 variant="outline"
                 onClick={() => fetchPredictionData()} // Wrap in arrow function
                 disabled={refreshing}
+                className="w-full sm:w-auto"
               >
                 <RefreshCcw
                   className={`h-4 w-4 ${refreshing ? "animate-spin" : ""} mr-2`}
@@ -523,7 +528,7 @@ export default function PredictionPage() {
           </div>
 
           {/* Model status indicator */}
-          <div className="mt-4 flex items-center justify-between">
+          <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
             <div className="flex items-center">
               <div className="mr-2 text-sm text-muted-foreground">
                 Model status:
@@ -567,7 +572,7 @@ export default function PredictionPage() {
           </div>
 
           {/* ML Model Steps Progress */}
-          <div className="mt-6 border rounded-lg p-3">
+          <div className="mt-4 sm:mt-6 border rounded-lg p-3">
             <h4 className="text-sm font-medium mb-3">
               Machine Learning Pipeline Status
             </h4>
@@ -632,55 +637,59 @@ export default function PredictionPage() {
           description={`Hourly air quality predictions starting with current AQI: ${
             currentAQI?.aqi || "Loading..."
           }`}
-          height={350}
+          height={300}
           hourly={true}
         />
       </div>
 
       {/* Weekly prediction cards and chart */}
       <div className="grid gap-6 grid-cols-1 md:grid-cols-2 mb-6">
-        <Card className="md:row-span-2">
+        {/* Weekly forecast cards */}
+        <Card className="md:row-span-2 order-2 md:order-1">
           <CardHeader>
-            <CardTitle>7-Day AQI Forecast</CardTitle>
+            <CardTitle className="text-lg">7-Day AQI Forecast</CardTitle>
             <CardDescription>
               Predicted air quality starting from today&apos;s AQI:{" "}
               {currentAQI?.aqi || "Loading..."}
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 pt-0">
             {loading ? (
-              <div className="flex items-center justify-center h-[300px]">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <div className="flex items-center justify-center h-[200px] md:h-[300px]">
+                <Loader2 className="h-6 w-6 md:h-8 md:w-8 animate-spin text-primary" />
               </div>
             ) : weeklyPredictions.length > 0 ? (
-              weeklyPredictions.map((prediction) => (
-                <DailyAqiCard
-                  key={prediction.timestamp}
-                  timestamp={prediction.timestamp}
-                  aqi={prediction.aqi}
-                />
-              ))
+              <div className="grid gap-3 md:gap-4 grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-1 lg:grid-cols-2">
+                {weeklyPredictions.map((prediction) => (
+                  <DailyAqiCard
+                    key={prediction.timestamp}
+                    timestamp={prediction.timestamp}
+                    aqi={prediction.aqi}
+                  />
+                ))}
+              </div>
             ) : (
-              <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+              <div className="flex items-center justify-center h-[200px] md:h-[300px] text-muted-foreground">
                 No weekly forecast data available
               </div>
             )}
           </CardContent>
         </Card>
 
-        <div className="space-y-6">
+        {/* Weekly trend chart and download */}
+        <div className="space-y-6 order-1 md:order-2">
           <AqiPredictionChart
             data={weeklyPredictions}
             title="Weekly Trend"
-            height={250}
+            height={220}
             showConfidence={true}
             hourly={false}
           />
 
           <Card>
-            <CardHeader>
-              <CardTitle>Detailed Report</CardTitle>
-              <CardDescription>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Detailed Report</CardTitle>
+              <CardDescription className="text-xs md:text-sm">
                 Export prediction data for further analysis
               </CardDescription>
             </CardHeader>
