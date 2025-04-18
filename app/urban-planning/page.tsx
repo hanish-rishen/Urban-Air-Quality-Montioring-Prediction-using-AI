@@ -82,6 +82,8 @@ export default function UrbanPlanningPage() {
 
   // Drawing state
   const drawingPoints = useRef<number[][]>([]);
+  // Add a state variable to track point count for UI updates
+  const [pointCount, setPointCount] = useState<number>(0);
 
   // State for urban planning features
   const [selectedArea, setSelectedArea] = useState<any>(null);
@@ -360,6 +362,44 @@ export default function UrbanPlanningPage() {
           features: [],
         },
       });
+
+      // Add the layers immediately after adding the source
+      // This ensures layers are present as soon as the source is created
+      map.current.addLayer({
+        id: "drawing-point-layer",
+        type: "circle",
+        source: "drawing-source",
+        filter: ["==", "$type", "Point"],
+        paint: {
+          "circle-radius": 5,
+          "circle-color": "#3b82f6",
+          "circle-stroke-width": 1,
+          "circle-stroke-color": "#ffffff",
+        },
+      });
+
+      map.current.addLayer({
+        id: "drawing-line-layer",
+        type: "line",
+        source: "drawing-source",
+        filter: ["==", "$type", "LineString"],
+        paint: {
+          "line-color": "#3b82f6",
+          "line-width": 2,
+          "line-dasharray": [2, 1],
+        },
+      });
+
+      map.current.addLayer({
+        id: "drawing-fill-layer",
+        type: "fill",
+        source: "drawing-source",
+        filter: ["==", "$type", "Polygon"],
+        paint: {
+          "fill-color": "#3b82f6",
+          "fill-opacity": 0.3,
+        },
+      });
     } else {
       // If it exists, clear its data
       map.current.getSource("drawing-source")?.setData({
@@ -490,6 +530,7 @@ export default function UrbanPlanningPage() {
       // Only clear drawings when activating a new drawing mode, not when deactivating
       clearExistingDrawings();
       drawingPoints.current = []; // Reset drawing points
+      setPointCount(0); // Reset point count state
       initDrawingSource(); // Reinitialize source
     }
 
@@ -502,75 +543,68 @@ export default function UrbanPlanningPage() {
 
       const coords = [e.lngLat.lng, e.lngLat.lat];
       drawingPoints.current.push(coords);
+      // Update the point count state to trigger re-render
+      setPointCount(drawingPoints.current.length);
 
       // Create polygon feature for visualization
       const polygonCoords = [...drawingPoints.current];
+
+      // For preview, close the polygon if we have at least 3 points
+      let features = [];
+
+      // Always add the line connecting points
       const polygonFeature = {
         type: "Feature",
         geometry: { type: "LineString", coordinates: polygonCoords },
         properties: {},
       };
+      features.push(polygonFeature);
+
+      // Add individual points
+      drawingPoints.current.forEach((coord) => {
+        features.push({
+          type: "Feature",
+          geometry: { type: "Point", coordinates: coord },
+          properties: {},
+        });
+      });
+
+      // If we have at least 3 points, also show a preview polygon
+      if (drawingPoints.current.length >= 3) {
+        const previewPolygonCoords = [
+          ...drawingPoints.current,
+          drawingPoints.current[0], // Close the polygon
+        ];
+
+        features.push({
+          type: "Feature",
+          geometry: { type: "Polygon", coordinates: [previewPolygonCoords] },
+          properties: {},
+        });
+      }
 
       // Update the drawing source
       const source = map.current.getSource("drawing-source");
       if (source) {
         source.setData({
           type: "FeatureCollection",
-          features: [
-            polygonFeature,
-            ...drawingPoints.current.map((coord) => ({
-              type: "Feature",
-              geometry: { type: "Point", coordinates: coord },
-              properties: {},
-            })),
-          ],
+          features: features,
         });
       } else {
         console.error("Drawing source not found in addPointHandler");
       }
-
-      // Add polygon visualization layers if they don't exist
-      if (!map.current.getLayer("drawing-point-layer")) {
-        map.current.addLayer({
-          id: "drawing-point-layer",
-          type: "circle",
-          source: "drawing-source",
-          filter: ["==", "$type", "Point"],
-          paint: {
-            "circle-radius": 5,
-            "circle-color": "#3b82f6",
-            "circle-stroke-width": 1,
-            "circle-stroke-color": "#ffffff",
-          },
-        });
-      }
-      if (!map.current.getLayer("drawing-line-layer")) {
-        map.current.addLayer({
-          id: "drawing-line-layer",
-          type: "line",
-          source: "drawing-source",
-          filter: ["==", "$type", "LineString"],
-          paint: {
-            "line-color": "#3b82f6",
-            "line-width": 2,
-            "line-dasharray": [2, 1],
-          },
-        });
-      }
-      if (!map.current.getLayer("drawing-fill-layer")) {
-        map.current.addLayer({
-          id: "drawing-fill-layer",
-          type: "fill",
-          source: "drawing-source",
-          filter: ["==", "$type", "Polygon"],
-          paint: { "fill-color": "#3b82f6", "fill-opacity": 0.3 },
-        });
-      }
     };
 
     const finishPolygonHandler = (e: any) => {
-      e.preventDefault();
-      e.originalEvent.stopPropagation();
+      // If this is a synthetic event from our button, we need to prevent default differently
+      if (e && e.preventDefault) {
+        e.preventDefault();
+      }
+
+      // If this is a synthetic event from our button, we handle stopPropagation differently
+      if (e && e.originalEvent && e.originalEvent.stopPropagation) {
+        e.originalEvent.stopPropagation();
+      }
 
       // Only finish if we have enough points
       if (drawingPoints.current.length < 3) {
@@ -609,10 +643,14 @@ export default function UrbanPlanningPage() {
         type: "FeatureCollection",
         features: [finalPolygonFeature],
       });
+      setPointCount(0); // Reset point count when finished
 
       // NOW fetch area data ONLY when the polygon is completed
       fetchAreaData(finalPolygonFeature); // Call the memoized fetchAreaData
     };
+
+    // Store the handler in a ref so we can access it from outside the effect
+    finishPolygonHandlerRef.current = finishPolygonHandler;
 
     const mouseMoveHandler = (e: any) => {
       // Check if drawing mode is still active and drawingPoints has items
@@ -622,39 +660,49 @@ export default function UrbanPlanningPage() {
       if (!map.current || !map.current.getSource("drawing-source")) return;
 
       const currentCoords = [e.lngLat.lng, e.lngLat.lat];
-      // Show temporary line to cursor and preview polygon fill
-      const previewLineCoords = [...drawingPoints.current, currentCoords];
-      const previewPolygonCoords = [
-        ...drawingPoints.current,
-        currentCoords,
-        drawingPoints.current[0], // Close preview polygon
-      ];
 
-      const previewLineFeature = {
+      // Construct features array
+      let features = [];
+
+      // 1. Add points for all vertices
+      drawingPoints.current.forEach((coord) => {
+        features.push({
+          type: "Feature",
+          geometry: { type: "Point", coordinates: coord },
+          properties: {},
+        });
+      });
+
+      // 2. Add the preview line from vertices to current mouse position
+      const previewLineCoords = [...drawingPoints.current, currentCoords];
+      features.push({
         type: "Feature",
         geometry: { type: "LineString", coordinates: previewLineCoords },
-        properties: { preview: true }, // Mark as preview line
-      };
-      const previewPolygonFeature = {
-        type: "Feature",
-        geometry: { type: "Polygon", coordinates: [previewPolygonCoords] },
-        properties: { preview: true }, // Mark as preview polygon
-      };
+        properties: { preview: true },
+      });
+
+      // 3. If we have at least 2 points (meaning with current mouse pos we have 3),
+      // also add a preview polygon
+      if (drawingPoints.current.length >= 2) {
+        const previewPolygonCoords = [
+          ...drawingPoints.current,
+          currentCoords,
+          drawingPoints.current[0], // Close the polygon
+        ];
+
+        features.push({
+          type: "Feature",
+          geometry: { type: "Polygon", coordinates: [previewPolygonCoords] },
+          properties: { preview: true },
+        });
+      }
+
+      // Update the source with all features
       const source = map.current.getSource("drawing-source");
       if (source) {
-        // Combine existing points with preview line/polygon
         source.setData({
           type: "FeatureCollection",
-          features: [
-            previewPolygonFeature, // Show filled preview polygon
-            previewLineFeature, // Show line segments including to cursor
-            ...drawingPoints.current.map((coord) => ({
-              // Keep showing vertices
-              type: "Feature",
-              geometry: { type: "Point", coordinates: coord },
-              properties: {},
-            })),
-          ],
+          features: features,
         });
       }
     };
@@ -690,6 +738,39 @@ export default function UrbanPlanningPage() {
       }
     };
   }, [drawingMode, isMapLoaded, fetchAreaData]); // Add drawingMode and fetchAreaData dependencies
+
+  // Cancel drawing function that resets the drawing mode and cleans up
+  const handleCancelDrawing = () => {
+    // Clear drawing points
+    drawingPoints.current = [];
+    setPointCount(0);
+
+    // Deactivate drawing mode
+    setDrawingMode({ ...drawingMode, active: false });
+
+    // Clear any existing drawing graphics
+    clearExistingDrawings();
+
+    // Re-enable map panning
+    if (map.current) {
+      map.current.dragPan.enable();
+    }
+  };
+
+  // Add keyboard escape handler for drawing mode
+  useEffect(() => {
+    const handleEscapeKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && drawingMode.active) {
+        handleCancelDrawing();
+      }
+    };
+
+    window.addEventListener("keydown", handleEscapeKey);
+
+    return () => {
+      window.removeEventListener("keydown", handleEscapeKey);
+    };
+  }, [drawingMode.active]);
 
   // Toggle layer visibility
   const toggleLayer = (layer: string) => {
@@ -1048,11 +1129,227 @@ Based on the elevation of ${areaData.topology?.elevation}m with ${areaData.topol
     }, 5000);
   };
 
+  // Add a ref to store the finishPolygonHandler
+  const finishPolygonHandlerRef = useRef<((e: any) => void) | null>(null);
+
+  // ADD Consolidated useEffect for map interaction listeners
+  useEffect(() => {
+    if (!map.current || !tomtom.current || !isMapLoaded) return;
+
+    // Log mode changes to debug
+    console.log("Mode change detected:", {
+      drawingMode: drawingMode.active ? drawingMode.type : "inactive",
+    });
+
+    // 1. Always clear previous listeners and graphics first
+    map.current.off("click");
+    map.current.off("dblclick");
+    map.current.off("mousemove");
+    map.current.off("contextmenu"); // Clear right-click listener
+
+    // Reset drawing data when changing modes
+    if (drawingMode.active) {
+      // Only clear drawings when activating a new drawing mode, not when deactivating
+      clearExistingDrawings();
+      drawingPoints.current = []; // Reset drawing points
+      setPointCount(0); // Reset point count state
+      initDrawingSource(); // Reinitialize source
+    }
+
+    // Polygon handlers
+    const addPointHandler = (e: any) => {
+      // ...existing code...
+    };
+
+    const finishPolygonHandler = (e: any) => {
+      // If this is a synthetic event from our button, we need to prevent default differently
+      if (e && e.preventDefault) {
+        e.preventDefault();
+      }
+
+      // If this is a synthetic event from our button, we handle stopPropagation differently
+      if (e && e.originalEvent && e.originalEvent.stopPropagation) {
+        e.originalEvent.stopPropagation();
+      }
+
+      // Only finish if we have enough points
+      if (drawingPoints.current.length < 3) {
+        console.log("Need at least 3 points to finish polygon.");
+        alert("Please add at least 3 points before finishing the polygon."); // Give clear user feedback
+        return;
+      }
+
+      // --- Finish Polygon Logic (same as before) ---
+      const finalCoords = [
+        ...drawingPoints.current,
+        drawingPoints.current[0], // Close the polygon
+      ];
+      const finalPolygonFeature = {
+        type: "Feature",
+        geometry: { type: "Polygon", coordinates: [finalCoords] },
+        properties: {},
+      };
+      const source = map.current.getSource("drawing-source");
+      if (source) {
+        source.setData({
+          type: "FeatureCollection",
+          features: [finalPolygonFeature],
+        });
+      } else {
+        console.error("Drawing source not found in finishPolygonHandler");
+      }
+
+      // Update state & explicitly remove event listeners to prevent callbacks after cleanup
+      if (map.current) {
+        map.current.off("mousemove", mouseMoveHandler);
+        map.current.off("click", addPointHandler);
+        map.current.off("contextmenu", finishPolygonHandler);
+      }
+
+      setDrawingMode({ ...drawingMode, active: false });
+      setSelectedArea({
+        type: "FeatureCollection",
+        features: [finalPolygonFeature],
+      });
+      setPointCount(0); // Reset point count when finished
+
+      // NOW fetch area data ONLY when the polygon is completed
+      fetchAreaData(finalPolygonFeature); // Call the memoized fetchAreaData
+    };
+
+    // Store the handler in a ref so we can access it from outside the effect
+    finishPolygonHandlerRef.current = finishPolygonHandler;
+
+    const mouseMoveHandler = (e: any) => {
+      // Check if drawing mode is still active and drawingPoints has items
+      if (!drawingMode.active || drawingPoints.current.length === 0) return;
+
+      // Check if the source still exists - if not, exit early
+      if (!map.current || !map.current.getSource("drawing-source")) return;
+
+      const currentCoords = [e.lngLat.lng, e.lngLat.lat];
+
+      // Construct features array
+      let features = [];
+
+      // 1. Add points for all vertices
+      drawingPoints.current.forEach((coord) => {
+        features.push({
+          type: "Feature",
+          geometry: { type: "Point", coordinates: coord },
+          properties: {},
+        });
+      });
+
+      // 2. Add the preview line from vertices to current mouse position
+      const previewLineCoords = [...drawingPoints.current, currentCoords];
+      features.push({
+        type: "Feature",
+        geometry: { type: "LineString", coordinates: previewLineCoords },
+        properties: { preview: true },
+      });
+
+      // 3. If we have at least 2 points (meaning with current mouse pos we have 3),
+      // also add a preview polygon
+      if (drawingPoints.current.length >= 2) {
+        const previewPolygonCoords = [
+          ...drawingPoints.current,
+          currentCoords,
+          drawingPoints.current[0], // Close the polygon
+        ];
+
+        features.push({
+          type: "Feature",
+          geometry: { type: "Polygon", coordinates: [previewPolygonCoords] },
+          properties: { preview: true },
+        });
+      }
+
+      // Update the source with all features
+      const source = map.current.getSource("drawing-source");
+      if (source) {
+        source.setData({
+          type: "FeatureCollection",
+          features: features,
+        });
+      }
+    };
+
+    // Attach listeners based on the active mode
+    if (drawingMode.active) {
+      console.log(`Attaching ${drawingMode.type} drawing handlers`);
+
+      // First, clear any existing drawing data to avoid mode conflicts
+      clearExistingDrawings();
+      drawingPoints.current = []; // Reset drawing points
+      initDrawingSource(); // Reinitialize source
+
+      // Only handle polygon drawing now
+      map.current.on("click", addPointHandler);
+      map.current.on("contextmenu", finishPolygonHandler);
+      map.current.on("mousemove", mouseMoveHandler);
+    }
+
+    // Cleanup function
+    return () => {
+      console.log("Cleaning up map listeners");
+      if (map.current) {
+        map.current.off("click");
+        map.current.off("dblclick");
+        map.current.off("mousemove");
+        map.current.off("contextmenu");
+
+        // Explicitly clean up specific handlers to be extra safe
+        map.current.off("click", addPointHandler);
+        map.current.off("mousemove", mouseMoveHandler);
+        map.current.off("contextmenu", finishPolygonHandler);
+      }
+    };
+  }, [drawingMode, isMapLoaded, fetchAreaData]); // Add drawingMode and fetchAreaData dependencies
+
+  // Update the Finish Drawing button to use our stored handler
+  const handleFinishDrawing = () => {
+    if (finishPolygonHandlerRef.current) {
+      // Only allow finishing if we have enough points
+      if (pointCount >= 3) {
+        // Call the handler with a minimal synthetic event
+        finishPolygonHandlerRef.current({
+          preventDefault: () => {},
+          originalEvent: { stopPropagation: () => {} },
+        });
+
+        // Ensure the layers are properly updated with the final polygon
+        if (map.current && drawingPoints.current.length >= 3) {
+          const finalCoords = [
+            ...drawingPoints.current,
+            drawingPoints.current[0], // Close the polygon
+          ];
+
+          const finalPolygonFeature = {
+            type: "Feature",
+            geometry: { type: "Polygon", coordinates: [finalCoords] },
+            properties: {},
+          };
+
+          const source = map.current.getSource("drawing-source");
+          if (source) {
+            source.setData({
+              type: "FeatureCollection",
+              features: [finalPolygonFeature],
+            });
+          }
+        }
+      } else {
+        alert("Please add at least 3 points before finishing the polygon.");
+      }
+    }
+  };
+
   // --- Render Logic ---
   return (
     <>
       {/* Mobile-optimized layout - adjusted for existing sidebar */}
-      <div className="h-screen overflow-hidden bg-background flex flex-col pt-20 lg:pt-8 lg:pl-72">
+      <div className="h-screen overflow-hidden bg-background flex flex-col pt-14 md:pt-16 lg:pt-4 lg:pl-72">
         {/* Page header - adjusted for mobile sidebar */}
         <div className="p-4 md:p-8 flex-shrink-0 flex items-center justify-between">
           <div>
@@ -1309,8 +1606,9 @@ Based on the elevation of ${areaData.topology?.elevation}m with ${areaData.topol
                       <CardContent className="px-3 pb-3 pt-0 text-xs text-muted-foreground space-y-1">
                         <p>Select a tool to interact with the map.</p>
                         <p>
-                          <strong>Draw Polygon:</strong> Tap to add points,
-                          two-finger tap to finish (min 3 points).
+                          <strong>Draw Polygon:</strong> Tap to add points. Use
+                          the &apos;Finish Drawing&apos; button when done (min 3
+                          points).
                         </p>
                         <p>
                           <strong>Select/Pan:</strong> Drag map. Tap drawn
@@ -1553,9 +1851,31 @@ Based on the elevation of ${areaData.topology?.elevation}m with ${areaData.topol
                 <div className="absolute bottom-16 md:bottom-4 left-4 right-4 p-3 bg-background/95 rounded-md shadow border z-10 text-center">
                   <p className="text-sm">
                     {isMobile
-                      ? "Tap to add points. Two-finger tap to finish (min 3 points)."
-                      : "Click to add polygon points. Right-click to finish (min 3 points)."}
+                      ? "Tap to add points. Use the 'Finish Drawing' button when done (min 3 points)."
+                      : "Click to add polygon points. Right-click to finish (min 3 points). Press Escape to cancel."}
                   </p>
+                  {/* Add finish and cancel drawing buttons */}
+                  <div className="flex gap-2 justify-center mt-2">
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={handleCancelDrawing}
+                    >
+                      Cancel
+                    </Button>
+
+                    {isMobile && (
+                      <Button
+                        size="sm"
+                        variant="default"
+                        onClick={handleFinishDrawing}
+                        disabled={pointCount < 3}
+                      >
+                        Finish Drawing{" "}
+                        {pointCount >= 3 ? "✓" : `(${pointCount}/3)`}
+                      </Button>
+                    )}
+                  </div>
                 </div>
               )}
             </Card>
